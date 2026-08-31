@@ -73,6 +73,12 @@ Polycam bakes floor slabs with both up- and down-facing triangles; summing all p
 
 Fully static — GitHub Pages, Netlify or any static host works as-is (the Google Fonts stylesheet is the only external request besides the three.js CDN).
 
+The live instance at **https://plan.yusufanilyazici.com** runs on a Hetzner box behind Traefik (Coolify's proxy): a plain `nginx:alpine` container serves a checkout of this repo from `/opt/planstudio/app`, with Traefik labels handling the vhost, HTTPS redirect and Let's Encrypt certificate. Updating the deployment is a `git pull` in that directory:
+
+```bash
+ssh root@SERVER 'cd /opt/planstudio/app && git pull'
+```
+
 ## Credits & license
 
 - Code: [MIT](LICENSE)
