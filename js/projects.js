@@ -12,9 +12,12 @@ const BUILTIN = [
   { file: 'nisantasi-1p1.glb', label: 'Nişantaşı 1+1' },
 ];
 // design-suggestion variants: same GLB, separate state, seeded from a preset
+// design suggestions built from the user's own exported layout: same rooms,
+// same furniture — only rearranged
 const PRESETS = [
-  // design-suggestion cards are seeded from the user's own exported layout —
-  // see the export action on each card
+  { file: 'nisantasi-1p1.glb', state: 'nisantasi-user-a', label: 'Nişantaşı · Öneri A — Sinema hattı', preset: 'presets/nisantasi-user-a.json' },
+  { file: 'nisantasi-1p1.glb', state: 'nisantasi-user-b', label: 'Nişantaşı · Öneri B — Sohbet düzeni', preset: 'presets/nisantasi-user-b.json' },
+  { file: 'nisantasi-1p1.glb', state: 'nisantasi-user-c', label: 'Nişantaşı · Öneri C — Manzara düzeni', preset: 'presets/nisantasi-user-c.json' },
 ];
 const FORKS_KEY = 'ps:forks';
 function forks() {
@@ -84,10 +87,11 @@ async function ensurePreset(state, presetUrl) {
   try {
     if (localStorage.getItem('fp:v1:' + state)) return;
     const data = await (await fetch(presetUrl)).json();
-    localStorage.setItem('fp:v1:' + state, JSON.stringify({
+    const st = data.full || {
       version: 1, roomNames: {}, scanEdits: {}, clones: [], doors: [],
       furniture: data.furniture || [],
-    }));
+    };
+    localStorage.setItem('fp:v1:' + state, JSON.stringify(st));
   } catch {}
 }
 
