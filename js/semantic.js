@@ -55,6 +55,17 @@ const DEFAULT_HIDDEN = {
   '8_31_2026.glb': ['Door_2'],
 };
 
+// glass walls: the scan left these wall sections as open gaps — fill them
+// with arched windows sized to each opening (user-confirmed for this flat)
+const DEFAULT_WINDOWS = {
+  'nisantasi-1p1.glb': [
+    { pos: [2.42, -0.10, -3.30], rotY: 0,       w: 1.38 },  // salon güney
+    { pos: [-2.45, -0.10, -3.30], rotY: 0,      w: 1.68 },  // yatak odası güney
+    { pos: [-4.83, -0.10, -2.11], rotY: 1.5708, w: 1.72 },  // yatak odası batı
+    { pos: [-4.39, -0.10, 1.51], rotY: 1.5708,  w: 1.74 },  // mutfak batı
+  ],
+};
+
 function onModel(model) {
   semantic = detect(model);
   const autoPref = (() => { try { return localStorage.getItem('ps:autoMeasure') !== '0'; } catch { return true; } })();
@@ -70,6 +81,15 @@ function onModel(model) {
         st.scanEdits[name] ||= { deleted: true };
       }
       st.defaultsApplied = true;
+      persist.save();
+    }
+    if (!st.windowsApplied && DEFAULT_WINDOWS[ctx.modelFile]) {
+      for (const w of DEFAULT_WINDOWS[ctx.modelFile]) {
+        const rec = { catalogId: 'proc:archwindow', pos: w.pos, rotY: w.rotY, w: w.w };
+        st.furniture.push(rec);
+        ctx.restoreFurnitureRec?.(rec);   // catalog's restore pass already ran
+      }
+      st.windowsApplied = true;
       persist.save();
     }
     editor.registerScanObjects(semantic);

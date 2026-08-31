@@ -13,9 +13,8 @@ const BUILTIN = [
 ];
 // design-suggestion variants: same GLB, separate state, seeded from a preset
 const PRESETS = [
-  { file: 'nisantasi-1p1.glb', state: 'nisantasi-oneri-a', label: 'Nişantaşı · Öneri A — TV karşısı', preset: 'presets/nisantasi-a.json' },
-  { file: 'nisantasi-1p1.glb', state: 'nisantasi-oneri-b', label: 'Nişantaşı · Öneri B — Çalışma köşesi', preset: 'presets/nisantasi-b.json' },
-  { file: 'nisantasi-1p1.glb', state: 'nisantasi-oneri-c', label: 'Nişantaşı · Öneri C — Yemek alanı', preset: 'presets/nisantasi-c.json' },
+  // design-suggestion cards are seeded from the user's own exported layout —
+  // see the export action on each card
 ];
 const FORKS_KEY = 'ps:forks';
 function forks() {
@@ -336,6 +335,24 @@ function card({ modelName, label, onOpen, onDelete, onFork }) {
     startRename(nameEl, modelName, label);
   };
   actions.appendChild(renameBtn);
+  {
+    const expBtn = document.createElement('button');
+    expBtn.title = t('menu.export');
+    expBtn.innerHTML = '<svg class="ico" style="width:13px;height:13px"><use href="#i-download"/></svg>';
+    expBtn.onclick = ev => {
+      ev.stopPropagation();
+      const st = stateOf(modelName);
+      if (!st) { alert(t('cmp.notOpened')); return; }
+      const blob = new Blob([JSON.stringify({ planstudio: 1, state: modelName, label, data: st }, null, 1)],
+        { type: 'application/json' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = label.replace(/[^\w\dğüşöçıİĞÜŞÖÇ -]+/g, '') + '.planstudio.json';
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+    };
+    actions.appendChild(expBtn);
+  }
   if (onFork) {
     const forkBtn = document.createElement('button');
     forkBtn.title = t('menu.fork');

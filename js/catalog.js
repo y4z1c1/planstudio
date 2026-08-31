@@ -149,20 +149,9 @@ export function init(c) {
   });
 
   ctx.modelHooks.push(() => {
-    for (const rec of persist.get().furniture) {
-      if (rec.catalogId?.startsWith('user:')) {
-        spawnUser(rec.catalogId.slice(5), rec);
-        continue;
-      }
-      if (rec.catalogId?.startsWith('proc:')) {
-        spawnProc(rec.catalogId, rec);
-        continue;
-      }
-      const def = kenneyById.get(rec.catalogId);
-      if (!def) continue;
-      spawnKenney(def, rec).catch(() => {});
-    }
+    for (const rec of persist.get().furniture) restoreRec(rec);
   });
+  ctx.restoreFurnitureRec = restoreRec;   // late additions (e.g. auto windows)
 
   // cross-project copy (editor context menu) drops exported objects here
   ctx.importUserModel = importUserModel;
@@ -276,6 +265,14 @@ function spawnBoxFallback(key) {
   spawnBox(f);
 }
 
+// spawn a persisted furniture record of any kind (restore path)
+function restoreRec(rec) {
+  if (rec.catalogId?.startsWith('user:')) return spawnUser(rec.catalogId.slice(5), rec);
+  if (rec.catalogId?.startsWith('proc:')) return spawnProc(rec.catalogId, rec);
+  const def = kenneyById.get(rec.catalogId);
+  if (def) spawnKenney(def, rec).catch(() => {});
+}
+
 // ---------- procedural items (no GLB source) ----------
 // arch floor mirror, 100×180, thin black metal frame, leaning slightly back
 function buildMirror() {
@@ -316,8 +313,8 @@ function buildMirror() {
 }
 
 // arched window with black muntin grid (Nişantaşı style), wall-mountable
-function buildArchWindow() {
-  const W = 1.4, H = 2.2, T = 0.05, D = 0.06;
+function buildArchWindow(width) {
+  const W = width || 1.4, H = 2.2, T = 0.05, D = 0.06;
   const arch = inset => {
     const w2 = W / 2 - inset, top = H - inset, r = w2;
     const sh = new THREE.Shape();
@@ -364,7 +361,7 @@ const PROC = {
 function spawnProc(id, rec = null) {
   const def = PROC[id];
   if (!def) return null;
-  const m = def.build();
+  const m = def.build(rec?.w);
   m.userData = { catalogId: id, label: t(def.key), wallMount: !!def.wallMount };
   m.add(makeTextLabel(t(def.key), new THREE.Vector3(0, 1.95, 0), '#cdd2da', 'furn-label'));
   const floorY = ctx.modelBox ? ctx.modelBox.min.y : 0;
