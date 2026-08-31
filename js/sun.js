@@ -23,6 +23,9 @@ const LOCATIONS = {
   'nisantasi-1p1.glb': { lat: 41.0557574, lon: 28.9916382 },   // maps.app.goo.gl/DPXrF936TUXh2RhS6
 };
 const DEFAULT_LOC = { lat: 41.05, lon: 28.99 };                // İstanbul
+// scan-to-north calibration: the flat's west facade (salon + kitchen windows)
+// faces real-world southeast (~135°), read off the satellite view
+const NORTH_DEFAULTS = { 'nisantasi-1p1.glb': 135 };
 
 export function init(c) {
   ctx = c;
@@ -69,7 +72,7 @@ function enable() {
   active = true;
   btn.classList.add('active');
   panel.classList.add('show');
-  northInput.value = persist.get().sun?.north ?? 0;
+  northInput.value = persist.get().sun?.north ?? NORTH_DEFAULTS[ctx.modelFile] ?? 0;
 
   // sunlight only through the windows: ceiling back on, base lights dimmed
   savedCeiling = ctx.getCeiling ? ctx.getCeiling() : false;
