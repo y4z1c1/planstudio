@@ -24,12 +24,13 @@ let onCloneSource = null;
 // click-to-place state
 let placing = null;          // { obj, onPlace, onCancel }
 
-// ---------- wall physics for moving/placing objects ----------
-// The object's center may not cross walls or closed doors: movement is cast as
-// a ray and clamped just before the first blocking surface (with a margin of
-// half the object's smaller footprint side), sliding per axis when blocked.
+// ---------- soft wall handling for moving/placing objects ----------
+// "Sticky, not blocking": the object follows the cursor/crosshair freely, but
+// if its footprint would overlap a wall or closed door, it is pushed out just
+// enough to sit flush against it. It can never get wedged behind a wall.
 const blockRay = new THREE.Raycaster();
 const _bSize = new THREE.Vector3();
+const _pushDir = new THREE.Vector3();
 
 function blockers(self) {
   const list = [];
@@ -46,36 +47,33 @@ function blockers(self) {
 
 function constrainXZ(obj, tx, tz) {
   new THREE.Box3().setFromObject(obj).getSize(_bSize);
-  const margin = Math.max(0.05, Math.min(_bSize.x, _bSize.z) / 2);
   const midY = obj.position.y + _bSize.y * 0.5;
   const targets = blockers(obj);
+  let px = tx, pz = tz;
 
-  const attempt = (dx, dz) => {
-    const len = Math.hypot(dx, dz);
-    if (len < 1e-6) return false;
-    const dir = new THREE.Vector3(dx / len, 0, dz / len);
-    blockRay.set(new THREE.Vector3(obj.position.x, midY, obj.position.z), dir);
+  // probe the four footprint half-extents from the target center; any wall
+  // closer than the half-extent pushes the object back by the overlap
+  const probes = [
+    [1, 0, _bSize.x / 2], [-1, 0, _bSize.x / 2],
+    [0, 1, _bSize.z / 2], [0, -1, _bSize.z / 2],
+  ];
+  for (const [dx, dz, half] of probes) {
+    blockRay.set(new THREE.Vector3(px, midY, pz), _pushDir.set(dx, 0, dz));
     blockRay.near = 0;
-    blockRay.far = len + margin;
-    let allowed = len;
+    blockRay.far = half;
     for (const h of blockRay.intersectObjects(targets, true)) {
       if (!h.object.visible) continue;
       let o = h.object, own = false;
       while (o) { if (o === obj) { own = true; break; } o = o.parent; }
       if (own) continue;
-      allowed = Math.max(0, h.distance - margin);
+      const push = half - h.distance;
+      px -= dx * push;
+      pz -= dz * push;
       break;
     }
-    if (allowed <= 1e-4) return false;
-    obj.position.x += dir.x * allowed;
-    obj.position.z += dir.z * allowed;
-    return true;
-  };
-
-  const dx = tx - obj.position.x, dz = tz - obj.position.z;
-  if (!attempt(dx, dz)) {
-    attempt(dx, 0) || attempt(0, dz);
   }
+  obj.position.x = px;
+  obj.position.z = pz;
 }
 
 // hover state
