@@ -130,6 +130,23 @@ document.getElementById('lang-sw-menu').appendChild(langSw.cloneNode(true));
 document.querySelector('#lang-sw-menu #lang-tr').onclick = () => lang !== 'tr' && setLang('tr');
 document.querySelector('#lang-sw-menu #lang-en').onclick = () => lang !== 'en' && setLang('en');
 
+// ---------- save / discard (session baseline) ----------
+const btnSave = document.getElementById('btn-save');
+const btnDiscard = document.getElementById('btn-discard');
+persist.onDirtyChange(dirty => {
+  const disp = dirty ? 'flex' : 'none';
+  btnSave.style.display = disp;
+  btnDiscard.style.display = disp;
+});
+btnSave.onclick = () => {
+  persist.commitBaseline();
+  ctx.statusEl.textContent = t('status.saved');
+};
+btnDiscard.onclick = () => {
+  if (!confirm(t('confirm.discard'))) return;
+  if (persist.discardToBaseline()) ctx.reloadToProject();
+};
+
 // ---------- accordion groups ----------
 document.querySelectorAll('.grp-head').forEach(head => {
   head.addEventListener('click', () => head.parentElement.classList.toggle('open'));
@@ -244,6 +261,9 @@ function setModel(gltfScene, name) {
   for (const h of ctx.modelHooks) h(ctx.model, name);
   ceilingHidden = true;      // open with the plan view: ceiling hidden by default
   applyCeiling();
+  // open-time migrations/auto-measure are not user edits — reset the baseline
+  // once they settle so Save/Discard only reacts to real changes
+  setTimeout(() => persist.commitBaseline(), 1200);
 }
 
 // drag & drop (house model) — saved into the project store, then opened
@@ -306,12 +326,19 @@ addEventListener('resize', () => {
 
 window.__ctx = ctx;   // console debugging convenience
 
-// ---------- arrow-key panning in orbit view ----------
-// (walk mode consumes its own arrows; this covers the free/top views)
+// ---------- arrow-key / WASD panning in orbit view ----------
+// (walk mode consumes its own movement keys; this covers the free/top views)
 const panKeys = new Set();
-const PAN_MAP = { ArrowUp: 'f', ArrowDown: 'b', ArrowLeft: 'l', ArrowRight: 'r' };
+const PAN_MAP = {
+  ArrowUp: 'f', ArrowDown: 'b', ArrowLeft: 'l', ArrowRight: 'r',
+  w: 'f', W: 'f', s: 'b', S: 'b', a: 'l', A: 'l', d: 'r', D: 'r',
+};
 addEventListener('keydown', ev => {
   if (ev.target.tagName === 'INPUT' || ctx.walkActive) return;
+  if (ev.metaKey || ev.ctrlKey || ev.altKey) return;
+  // with an object selected, letters belong to the editor (D = duplicate,
+  // R = rotate) — only the arrow keys keep panning then
+  if (editor.selected && !ev.key.startsWith('Arrow')) return;
   const k = PAN_MAP[ev.key];
   if (k) { ev.preventDefault(); panKeys.add(k); }
 });

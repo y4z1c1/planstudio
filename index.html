@@ -221,6 +221,7 @@
   .furn-label {
     background: rgba(19,21,25,.78); border-radius: 5px; padding: 2px 6px;
     font-size: 10px; color: #c8cdd5; white-space: nowrap;
+    display: none;   /* shown only while hovering/selected (editor.js) */
   }
   #crosshair {
     position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
@@ -307,6 +308,7 @@
   <symbol id="i-undo" viewBox="0 0 24 24"><path d="M4.5 10H14a5 5 0 010 10h-4M8.5 6l-4 4 4 4"/></symbol>
   <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
   <symbol id="i-x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 13l4.5 4.5L19 7"/></symbol>
   <symbol id="i-chev" viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></symbol>
   <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/></symbol>
   <symbol id="i-rotate" viewBox="0 0 24 24"><path d="M20 11a8 8 0 10.5 4M20 4v7h-7"/></symbol>
@@ -321,6 +323,8 @@
   <div class="sep"></div>
   <div id="model-name" data-i18n="top.noProject">proje seçilmedi</div>
   <div id="topbar-right">
+    <button class="btn" id="btn-save" style="display:none;width:auto;border-color:var(--accent-dim)"><svg class="ico"><use href="#i-check"/></svg><span class="lbl" data-i18n="btn.save">Kaydet</span></button>
+    <button class="btn" id="btn-discard" style="display:none;width:auto"><svg class="ico"><use href="#i-undo"/></svg><span class="lbl" data-i18n="btn.discard">Vazgeç</span></button>
     <div id="total-chip"><span data-i18n="top.netArea">Net alan</span><span class="v" id="total-chip-val">–</span></div>
     <div id="lang-sw">
       <button id="lang-tr">TR</button><button id="lang-en">EN</button>

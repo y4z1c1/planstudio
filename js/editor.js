@@ -487,20 +487,35 @@ function onKey(ev) {
 // ---------- hover dimensions (edit mode) ----------
 const hoverSize = new THREE.Vector3();
 
+// floating name tags (CSS2D .furn-label) are hidden by default — visible only
+// while their object is hovered or selected
+function setFurnLabel(obj, visible) {
+  if (!obj) return;
+  obj.traverse(o => {
+    if (o.isCSS2DObject && o.element.classList.contains('furn-label')) {
+      o.element.style.display = visible ? 'block' : 'none';
+    }
+  });
+}
+
 function updateHover(ev) {
-  if (ctx.mode !== 'edit' || ctx.walkActive) { clearHover(); return; }
-  const obj = pick(ev);
+  if (ctx.walkActive) { clearHover(); return; }
+  const obj = pick(ev);   // pick() applies mode rules (scan objects: edit only)
   if (!obj) { clearHover(); return; }
   if (obj !== hoverObj) {
     clearHover();
     hoverObj = obj;
-    hoverHelper = new THREE.Box3Helper(new THREE.Box3().setFromObject(obj), 0xe8b23e);
-    hoverHelper.material.depthTest = false;
-    hoverHelper.material.transparent = true;
-    hoverHelper.material.opacity = 0.7;
-    hoverHelper.renderOrder = 999;
-    ctx.scene.add(hoverHelper);
+    setFurnLabel(obj, true);
+    if (ctx.mode === 'edit') {
+      hoverHelper = new THREE.Box3Helper(new THREE.Box3().setFromObject(obj), 0xe8b23e);
+      hoverHelper.material.depthTest = false;
+      hoverHelper.material.transparent = true;
+      hoverHelper.material.opacity = 0.7;
+      hoverHelper.renderOrder = 999;
+      ctx.scene.add(hoverHelper);
+    }
   }
+  if (ctx.mode !== 'edit') { hoverDimsEl.style.display = 'none'; return; }
   new THREE.Box3().setFromObject(obj).getSize(hoverSize);
   hoverDimsEl.innerHTML =
     `<span class="t">${labelOf(obj)}</span>` +
@@ -517,6 +532,7 @@ function clearHover() {
     hoverHelper.material.dispose();
     hoverHelper = null;
   }
+  if (hoverObj && hoverObj !== selected) setFurnLabel(hoverObj, false);
   hoverObj = null;
   if (hoverDimsEl) hoverDimsEl.style.display = 'none';
 }
@@ -583,6 +599,7 @@ let helper = null;
 export function select(obj) {
   deselect();
   selected = obj;
+  setFurnLabel(obj, true);
   helper = new THREE.Box3Helper(new THREE.Box3().setFromObject(obj), 0x4f8ef7);
   helper.material.depthTest = false;
   helper.renderOrder = 1000;
@@ -592,6 +609,7 @@ export function select(obj) {
 }
 
 export function deselect() {
+  if (selected && selected !== hoverObj) setFurnLabel(selected, false);
   if (helper) {
     ctx.scene.remove(helper);
     helper.geometry.dispose();

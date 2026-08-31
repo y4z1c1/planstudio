@@ -301,8 +301,9 @@ async function spawnUser(name, rec = null) {
   }
   const m = tpl.root.clone(true);
   m.userData = { catalogId: 'user:' + name, label: name, sharedGeo: true };
+  const hasDims = /\d+×\d+/.test(name);
   m.add(makeTextLabel(
-    `${name} ${Math.round(tpl.w * 100)}×${Math.round(tpl.d * 100)}`,
+    hasDims ? name : `${name} ${Math.round(tpl.w * 100)}×${Math.round(tpl.d * 100)}`,
     new THREE.Vector3(0, tpl.h + 0.15, 0), '#cdd2da', 'furn-label'));
   const floorY = ctx.modelBox ? ctx.modelBox.min.y : 0;
   if (rec) {

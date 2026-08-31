@@ -14,6 +14,14 @@ let histKey = null;
 let store = null;
 let timer = null;
 
+// session baseline: the state the project was opened with. The save button
+// moves it forward; the discard button rolls storage back to it.
+let baseline = null;
+let dirtyCb = null;
+// meta (area/room-count/timestamp) is derived UI data, not a user edit —
+// it must not make the session look dirty
+const snap = st => JSON.stringify({ ...st, meta: undefined });
+
 export function loadFor(modelName) {
   key = PREFIX + modelName;
   histKey = key + ':history';
@@ -28,7 +36,31 @@ export function loadFor(modelName) {
   store.clones ||= [];
   store.doors ||= [];
   store.furniture ||= [];
+  baseline = snap(store);
+  if (dirtyCb) dirtyCb(false);
   return store;
+}
+
+export function onDirtyChange(fn) { dirtyCb = fn; }
+export function isDirty() { return store != null && snap(store) !== baseline; }
+
+export function commitBaseline() {
+  if (!store) return;
+  baseline = snap(store);
+  if (dirtyCb) dirtyCb(false);
+}
+
+export function discardToBaseline() {
+  if (!key || baseline == null) return false;
+  try {
+    const reverted = JSON.parse(baseline);
+    if (store?.meta) reverted.meta = store.meta;
+    localStorage.setItem(key, JSON.stringify(reverted));
+    const h = history();
+    h.push({ ts: Date.now(), data: baseline });
+    localStorage.setItem(histKey, JSON.stringify(h.slice(-40)));
+  } catch { return false; }
+  return true;
 }
 
 export function get() {
@@ -43,6 +75,7 @@ export function save() {
       localStorage.setItem(key, JSON.stringify(store));
       pushHistory();
     } catch {}
+    if (dirtyCb) dirtyCb(isDirty());
   }, 300);
 }
 
