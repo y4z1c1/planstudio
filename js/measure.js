@@ -32,6 +32,7 @@ export function init(c) {
     return false;
   });
   ctx.keyHooks.push(onKey);
+  ctx.cleanupHooks.push(cancelCurrent);
 }
 
 export function cancelCurrent() {

@@ -17,13 +17,15 @@ export function init(c) {
   totalRow = document.getElementById('total-row');
   totalVal = document.getElementById('total-val');
 
-  document.getElementById('btn-clear').onclick = () => {
+  const clearAll = () => {
     rooms.forEach(r => { ctx.scene.remove(r.group); disposeGroup(r.group); });
     rooms.length = 0;
     counters.dist = 0;
     counters.room = 0;
     updateResults();
   };
+  document.getElementById('btn-clear').onclick = clearAll;
+  ctx.cleanupHooks.push(clearAll);
 }
 
 export function addRecord(rec) {

@@ -116,6 +116,7 @@ export function init(c) {
   });
 
   ctx.tickHooks.push(tick);
+  ctx.cleanupHooks.push(() => { if (active) exit(); });
   ctx.walkDebug = { keys, isActive: () => active, isLocked: () => locked };
 }
 
@@ -151,12 +152,13 @@ function enter() {
   pitch = 0;
   // spawn at the center of the room nearest to where the user was looking —
   // starting at an arbitrary point can wedge the player into walls/furniture
-  const t = ctx.controls.target;
-  let sx = t.x, sz = t.z;
+  // (careful: don't shadow the imported i18n `t` here)
+  const tgt = ctx.controls.target;
+  let sx = tgt.x, sz = tgt.z;
   if (semantic.roomCenters.length) {
     let best = null, bd = Infinity;
     for (const r of semantic.roomCenters) {
-      const d = (r.centroid.x - t.x) ** 2 + (r.centroid.z - t.z) ** 2;
+      const d = (r.centroid.x - tgt.x) ** 2 + (r.centroid.z - tgt.z) ** 2;
       if (d < bd) { bd = d; best = r; }
     }
     sx = best.centroid.x; sz = best.centroid.z;

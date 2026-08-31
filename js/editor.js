@@ -115,6 +115,27 @@ export function init(c) {
   addEventListener('pointerdown', ev => {
     if (!ctxMenuEl.contains(ev.target)) hideCtxMenu();
   }, true);
+
+  ctx.cleanupHooks.push(cleanup);
+}
+
+// model is being replaced — drop every placed object and scan reference
+function cleanup() {
+  cancelPlacing();
+  deselect();
+  clearHover();
+  hideCtxMenu();
+  for (const obj of placed) {
+    ctx.scene.remove(obj);
+    obj.traverse(o => {
+      if (o.geometry && !obj.userData.sharedGeo && !obj.userData.scanName) o.geometry.dispose();
+      if (o.isCSS2DObject && o.element.parentNode) o.element.parentNode.removeChild(o.element);
+    });
+  }
+  placed.length = 0;
+  scanByName.clear();
+  translatedGeos.clear();
+  dragging = null;
 }
 
 export function setCloneSourceHandler(fn) { onCloneSource = fn; }

@@ -25,10 +25,10 @@ Scan your home with [Polycam](https://poly.cam), export it as GLB, drop it into 
 
 ## Running
 
-No build step. Any static file server works:
+No build step. Any static file server works; the bundled one disables caching (browsers heuristically cache ES modules, which bites during development):
 
 ```bash
-python3 -m http.server 8741
+python3 serve.py 8741
 # then open http://localhost:8741
 ```
 
@@ -86,4 +86,4 @@ Fully static — GitHub Pages, Netlify or any static host works as-is (the Googl
 
 PlanStudio, Polycam ile taranmış evleri görüntüleyen, oda oda **kesin m² ölçen** ve gerçek ölçülerde mobilya yerleştirmeye yarayan bir web uygulaması. Ev ararken adayları kıyaslamak için yapıldı: her GLB bir proje olur; ölçümler, düzenlemeler ve mobilya yerleşimi tarayıcıda kalıcı saklanır, `Ctrl+Z` ile geri alınır.
 
-**Kullanım:** `python3 -m http.server 8741` → `http://localhost:8741`. GLB dosyanı pencereye sürükle. Kısayollar: `G` dolaşma modu (WASD + fare, `Space` zıpla, `E` kapı aç/kapa), `R` döndür, `D` kopyala, `Delete` sil, `Ctrl/⌘+Z` geri al.
+**Kullanım:** `python3 serve.py 8741` → `http://localhost:8741`. GLB dosyanı pencereye sürükle. Kısayollar: `G` dolaşma modu (WASD + fare, `Space` zıpla, `E` kapı aç/kapa), `R` döndür, `D` kopyala, `Delete` sil, `Ctrl/⌘+Z` geri al.

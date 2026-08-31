@@ -208,6 +208,10 @@ ctx.loadModel = (url, name, revoke = false) => {
 };
 
 function setModel(gltfScene, name) {
+  // clear everything the previous model spawned at scene level (doors,
+  // furniture, clones, measurement overlays) — otherwise reopening a
+  // project duplicates them
+  for (const h of ctx.cleanupHooks) h();
   if (ctx.model) scene.remove(ctx.model);
   ctx.model = gltfScene;
   ctx.modelName = name;
@@ -289,6 +293,45 @@ addEventListener('resize', () => {
 });
 
 window.__ctx = ctx;   // console debugging convenience
+
+// ---------- arrow-key panning in orbit view ----------
+// (walk mode consumes its own arrows; this covers the free/top views)
+const panKeys = new Set();
+const PAN_MAP = { ArrowUp: 'f', ArrowDown: 'b', ArrowLeft: 'l', ArrowRight: 'r' };
+addEventListener('keydown', ev => {
+  if (ev.target.tagName === 'INPUT' || ctx.walkActive) return;
+  const k = PAN_MAP[ev.key];
+  if (k) { ev.preventDefault(); panKeys.add(k); }
+});
+addEventListener('keyup', ev => {
+  const k = PAN_MAP[ev.key];
+  if (k) panKeys.delete(k);
+});
+const panFwd = new THREE.Vector3(), panRight = new THREE.Vector3(), panMove = new THREE.Vector3();
+ctx.tickHooks.push(dt => {
+  if (ctx.walkActive || !panKeys.size || !ctx.model) return;
+  // forward = view direction on XZ; in near-top-down views fall back to the
+  // screen-up direction so the arrows still track the screen
+  panFwd.setFromMatrixColumn(camera.matrix, 2).negate();
+  panFwd.y = 0;
+  if (panFwd.lengthSq() < 0.05) {
+    panFwd.setFromMatrixColumn(camera.matrix, 1);
+    panFwd.y = 0;
+  }
+  if (panFwd.lengthSq() < 1e-6) return;
+  panFwd.normalize();
+  panRight.set(-panFwd.z, 0, panFwd.x);
+  panMove.set(0, 0, 0);
+  if (panKeys.has('f')) panMove.add(panFwd);
+  if (panKeys.has('b')) panMove.sub(panFwd);
+  if (panKeys.has('l')) panMove.sub(panRight);
+  if (panKeys.has('r')) panMove.add(panRight);
+  if (panMove.lengthSq() === 0) return;
+  const dist = camera.position.distanceTo(controls.target);
+  panMove.normalize().multiplyScalar(Math.max(2, dist * 0.5) * dt);
+  camera.position.add(panMove);
+  controls.target.add(panMove);
+});
 
 let lastT = performance.now();
 function animate() {

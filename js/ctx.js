@@ -30,6 +30,7 @@ export const ctx = {
   keyHooks: [],
   tickHooks: [],          // called each animation frame with dt seconds
   modelHooks: [],         // called after a model is set: fn(model, name)
+  cleanupHooks: [],       // called before a model is replaced (clear scene-level state)
 
   // helpers (assigned by main.js)
   setNDC: null,
