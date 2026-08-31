@@ -172,22 +172,24 @@ async function spawnKenney(def, rec = null) {
   return m;
 }
 
-// context-menu / D-key duplicate for placed catalog furniture
+// context-menu / D-key duplicate for placed catalog furniture — the copy goes
+// through the click-to-place flow like everything else
 function duplicateCatalogItem(obj) {
   const def = kenneyById.get(obj.userData.catalogId);
   if (!def) return null;
   loadTemplate(def).then(tpl => {
     const m = buildKenney(tpl, def);
     m.position.copy(obj.position);
-    m.position.x += 0.5;
-    m.position.z += 0.3;
     m.rotation.y = obj.rotation.y;
-    const r = { catalogId: def.id, pos: m.position.toArray(), rotY: m.rotation.y };
-    persist.get().furniture.push(r);
-    m.userData.rec = r;
-    m.userData.recList = persist.get().furniture;
-    persist.save();
-    editor.select(m);
+    editor.startPlacing(m, {
+      onPlace: o => {
+        const r = { catalogId: def.id, pos: o.position.toArray(), rotY: o.rotation.y };
+        persist.get().furniture.push(r);
+        o.userData.rec = r;
+        o.userData.recList = persist.get().furniture;
+        persist.save();
+      },
+    });
   });
   return true;
 }

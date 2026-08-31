@@ -333,6 +333,8 @@ function buildClone(src, sourceName) {
   return cl;
 }
 
+// duplicating hands the copy to the click-to-place flow (cursor / crosshair)
+// instead of dropping it at a fixed offset
 export function duplicate(obj) {
   if (obj.userData.catalogId && ctx.catalogDuplicate) {
     return ctx.catalogDuplicate(obj);
@@ -343,16 +345,17 @@ export function duplicate(obj) {
   if (!src) return null;
   const cl = buildClone(src, sourceName);
   cl.position.copy(obj.position);
-  cl.position.x += 0.5;
-  cl.position.z += 0.3;
   cl.rotation.y = obj.rotation.y;
-  const rec = { source: sourceName, pos: cl.position.toArray(), rotY: cl.rotation.y };
-  persist.get().clones.push(rec);
-  cl.userData.rec = rec;
-  cl.userData.recList = persist.get().clones;
-  persist.save();
-  if (onCloneSource) onCloneSource(sourceName);
-  select(cl);
+  startPlacing(cl, {
+    onPlace: o => {
+      const rec = { source: sourceName, pos: o.position.toArray(), rotY: o.rotation.y };
+      persist.get().clones.push(rec);
+      o.userData.rec = rec;
+      o.userData.recList = persist.get().clones;
+      persist.save();
+      if (onCloneSource) onCloneSource(sourceName);
+    },
+  });
   return cl;
 }
 
