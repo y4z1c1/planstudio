@@ -20,6 +20,7 @@ let yaw = 0, pitch = 0;
 const keys = new Set();
 let saved = null;
 let locked = false;
+let lockSuspended = false; // pointer freed for UI (catalog picking) while walking
 let looking = false;       // drag-look fallback when pointer lock unavailable
 let lastX = 0, lastY = 0;
 let btn = null;
@@ -46,8 +47,23 @@ export function init(c) {
 
   document.addEventListener('pointerlockchange', () => {
     locked = document.pointerLockElement === ctx.renderer.domElement;
-    if (active && !locked) exit();          // Esc in pointer lock = leave game mode
+    // Esc in pointer lock = leave game mode — unless the lock was suspended
+    // on purpose (catalog interaction)
+    if (active && !locked && !lockSuspended) exit();
   });
+
+  // main.js frees the pointer when the add panel opens during walk;
+  // editor.startPlacing re-engages it once an item is picked
+  ctx.walkSuspendLock = () => {
+    if (!active) return;
+    lockSuspended = true;
+    if (document.pointerLockElement) document.exitPointerLock?.();
+  };
+  ctx.walkResumeLock = () => {
+    if (!active) return;
+    lockSuspended = false;
+    requestLock();
+  };
   document.addEventListener('mousemove', ev => {
     if (!active || !locked) return;
     yaw -= ev.movementX * 0.0022;
@@ -60,8 +76,10 @@ export function init(c) {
     if (!active) return false;
     const measuring = ctx.mode === 'area' || ctx.mode === 'dist';
     if (locked) {
-      // crosshair click: measuring uses the screen center, otherwise use doors
-      if (measuring) {
+      // crosshair click: place > measure > door
+      if (editor.isPlacing()) {
+        editor.confirmPlacing();
+      } else if (measuring) {
         measure.clickAt({ clientX: innerWidth / 2, clientY: innerHeight / 2 });
       } else {
         interact();
@@ -69,7 +87,9 @@ export function init(c) {
       return true;
     }
     // not locked yet: clicking the canvas requests the lock (drag-look fallback)
+    lockSuspended = false;
     requestLock();
+    if (editor.isPlacing()) { editor.confirmPlacing(); looking = false; return true; }
     if (!measuring && aimedDoor) interact();
     looking = true;
     lastX = ev.clientX; lastY = ev.clientY;
@@ -99,7 +119,11 @@ export function init(c) {
   ctx.keyHooks.unshift(ev => {
     if (ev.key === 'g' || ev.key === 'G') { toggle(); return true; }
     if (!active) return false;
-    if (ev.key === 'Escape') { exit(); return true; }
+    if (ev.key === 'Escape') {
+      if (editor.isPlacing()) { editor.cancelPlacing(); return true; }   // cancel placement, stay walking
+      exit();
+      return true;
+    }
     if (ev.key === 'e' || ev.key === 'E') { interact(); return true; }
     if (ev.key === ' ') {
       ev.preventDefault();
@@ -304,6 +328,13 @@ function tick(dt) {
   ctx.camera.position.y = feetY + EYE + (grounded ? Math.sin(bobT) * 0.028 : 0);
   applyLook();
 
+  // an item being placed follows the crosshair (wall physics applied inside)
+  if (editor.isPlacing()) {
+    const dir = new THREE.Vector3();
+    ctx.camera.getWorldDirection(dir);
+    editor.placingAim(ctx.camera.position, dir);
+  }
+
   // door aim detection from screen center
   rayc.near = 0;
   rayc.far = 2.4;
@@ -319,7 +350,7 @@ function tick(dt) {
       aimedDoor = o;
     }
   }
-  if (aimedDoor && ctx.mode !== 'area' && ctx.mode !== 'dist') {
+  if (aimedDoor && ctx.mode !== 'area' && ctx.mode !== 'dist' && !editor.isPlacing()) {
     prompt.textContent = t(aimedDoor.userData.open ? 'walk.doorClose' : 'walk.doorOpen');
     prompt.style.display = 'block';
   } else {

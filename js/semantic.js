@@ -32,6 +32,7 @@ function roomName(meshName) {
 export function init(c) {
   ctx = c;
   ctx.modelHooks.push(onModel);
+  ctx.getWalls = () => semantic?.wallsGroup || null;   // editor wall physics
 
   // semantic models get exact per-room measurement; others fall back to the grid
   document.getElementById('btn-auto').onclick = () => {

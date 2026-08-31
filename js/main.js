@@ -189,7 +189,12 @@ ctx.keyHooks.push(ev => {
     case 'f': case 'F': {
       const grp = document.getElementById('grp-add');
       grp.classList.toggle('open');
-      if (grp.classList.contains('open')) document.getElementById('furn-search').focus();
+      if (grp.classList.contains('open')) {
+        // in walk mode free the pointer so the catalog is usable;
+        // picking an item re-locks it (editor.startPlacing)
+        if (ctx.walkActive) ctx.walkSuspendLock?.();
+        document.getElementById('furn-search').focus();
+      }
       return true;
     }
   }

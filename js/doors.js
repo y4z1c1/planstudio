@@ -30,6 +30,7 @@ export function init(c) {
     hints: [document.getElementById('hint-door')].filter(Boolean),
   });
   ctx.pointerHooks.up.push(onPointerUp);
+  ctx.getDoorBlockers = () => doorObjects;   // editor wall physics
   ctx.cleanupHooks.push(() => {
     doorObjects.length = 0;   // meshes themselves are removed by editor cleanup
     sem = null;

@@ -24,6 +24,60 @@ let onCloneSource = null;
 // click-to-place state
 let placing = null;          // { obj, onPlace, onCancel }
 
+// ---------- wall physics for moving/placing objects ----------
+// The object's center may not cross walls or closed doors: movement is cast as
+// a ray and clamped just before the first blocking surface (with a margin of
+// half the object's smaller footprint side), sliding per axis when blocked.
+const blockRay = new THREE.Raycaster();
+const _bSize = new THREE.Vector3();
+
+function blockers(self) {
+  const list = [];
+  const walls = ctx.getWalls?.();
+  if (walls) list.push(walls);
+  else if (ctx.model) list.push(ctx.model);
+  if (ctx.getDoorBlockers) {
+    for (const d of ctx.getDoorBlockers()) {
+      if (d !== self && d.parent && !d.userData.open) list.push(d);
+    }
+  }
+  return list;
+}
+
+function constrainXZ(obj, tx, tz) {
+  new THREE.Box3().setFromObject(obj).getSize(_bSize);
+  const margin = Math.max(0.05, Math.min(_bSize.x, _bSize.z) / 2);
+  const midY = obj.position.y + _bSize.y * 0.5;
+  const targets = blockers(obj);
+
+  const attempt = (dx, dz) => {
+    const len = Math.hypot(dx, dz);
+    if (len < 1e-6) return false;
+    const dir = new THREE.Vector3(dx / len, 0, dz / len);
+    blockRay.set(new THREE.Vector3(obj.position.x, midY, obj.position.z), dir);
+    blockRay.near = 0;
+    blockRay.far = len + margin;
+    let allowed = len;
+    for (const h of blockRay.intersectObjects(targets, true)) {
+      if (!h.object.visible) continue;
+      let o = h.object, own = false;
+      while (o) { if (o === obj) { own = true; break; } o = o.parent; }
+      if (own) continue;
+      allowed = Math.max(0, h.distance - margin);
+      break;
+    }
+    if (allowed <= 1e-4) return false;
+    obj.position.x += dir.x * allowed;
+    obj.position.z += dir.z * allowed;
+    return true;
+  };
+
+  const dx = tx - obj.position.x, dz = tz - obj.position.z;
+  if (!attempt(dx, dz)) {
+    attempt(dx, 0) || attempt(0, dz);
+  }
+}
+
 // hover state
 let hoverObj = null;
 let hoverHelper = null;
@@ -150,6 +204,9 @@ export function startPlacing(obj, { onPlace, onCancel } = {}) {
   placing = { obj, onPlace, onCancel };
   ctx.statusEl.textContent = t('status.placing');
   ctx.renderer.domElement.style.cursor = 'copy';
+  // picking from the catalog while walking: re-engage the pointer lock so the
+  // item can be aimed with the crosshair
+  if (ctx.walkActive && ctx.walkResumeLock) ctx.walkResumeLock();
 }
 
 export function cancelPlacing() {
@@ -177,10 +234,34 @@ function movePlacing(ev) {
   floorPlane.constant = -placing.obj.position.y;
   const hit = new THREE.Vector3();
   if (ctx.raycaster.ray.intersectPlane(floorPlane, hit)) {
-    placing.obj.position.x = hit.x;
-    placing.obj.position.z = hit.z;
+    constrainXZ(placing.obj, hit.x, hit.z);
     checkCollisions();
   }
+}
+
+// walk-mode support: aim the placing object with the crosshair ray
+export function isPlacing() { return !!placing; }
+export function confirmPlacing() { if (placing) finishPlacing(); }
+
+const _aimRay = new THREE.Ray();
+const _aimHit = new THREE.Vector3();
+export function placingAim(origin, dir) {
+  if (!placing) return;
+  const obj = placing.obj;
+  floorPlane.constant = -obj.position.y;
+  _aimRay.set(origin, dir);
+  let target = null;
+  if (_aimRay.intersectPlane(floorPlane, _aimHit) && _aimHit.distanceTo(origin) < 6) {
+    target = _aimHit;
+  } else {
+    // looking too far / at the horizon: hold the object ~2.5 m ahead
+    const fwd = dir.clone();
+    fwd.y = 0;
+    if (fwd.lengthSq() < 1e-6) return;
+    fwd.normalize().multiplyScalar(2.5);
+    target = _aimHit.set(origin.x + fwd.x, obj.position.y, origin.z + fwd.z);
+  }
+  constrainXZ(obj, target.x, target.z);
 }
 
 // ---------- scan object registration (called by semantic.js) ----------
@@ -359,8 +440,7 @@ function onPointerMove(ev) {
     ctx.setNDC(ev);
     const hit = new THREE.Vector3();
     if (ctx.raycaster.ray.intersectPlane(floorPlane, hit)) {
-      dragging.position.x = hit.x + dragOffset.x;
-      dragging.position.z = hit.z + dragOffset.z;
+      constrainXZ(dragging, hit.x + dragOffset.x, hit.z + dragOffset.z);
       refreshHighlight();
       checkCollisions();
     }
