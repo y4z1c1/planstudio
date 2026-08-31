@@ -24,7 +24,13 @@ export function init(c) {
     counters.room = 0;
     updateResults();
   };
-  document.getElementById('btn-clear').onclick = clearAll;
+  document.getElementById('btn-clear').onclick = () => {
+    // clearing the auto measurement by hand = "don't auto-show it next time"
+    if (rooms.some(r => r.auto)) {
+      try { localStorage.setItem('ps:autoMeasure', '0'); } catch {}
+    }
+    clearAll();
+  };
   ctx.cleanupHooks.push(clearAll);
 }
 

@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
 import { makeTextLabel } from './utils.js';
 import * as editor from './editor.js';
 import * as persist from './persist.js';
@@ -63,6 +64,10 @@ const kenneyById = new Map(KENNEY.map(d => [d.id, d]));
 const templateCache = new Map();
 const userTemplateCache = new Map();   // name -> Promise<{root,w,d,h}>
 const gltfLoader = new GLTFLoader();
+// IKEA rotera GLBs require KHR_draco_mesh_compression
+const draco = new DRACOLoader();
+draco.setDecoderPath('https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/libs/draco/gltf/');
+gltfLoader.setDRACOLoader(draco);
 
 export function init(c) {
   ctx = c;

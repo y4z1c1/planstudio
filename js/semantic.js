@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { COLORS, colorHex, makeTextLabel } from './utils.js';
-import { addRecord, clearAuto, setRenameHandler } from './results.js';
+import { addRecord, clearAuto, setRenameHandler, updateResults } from './results.js';
 import { autoMeasure as gridAutoMeasure } from './measure.js';
 import * as persist from './persist.js';
 import * as editor from './editor.js';
@@ -36,6 +36,7 @@ export function init(c) {
 
   // semantic models get exact per-room measurement; others fall back to the grid
   document.getElementById('btn-auto').onclick = () => {
+    try { localStorage.setItem('ps:autoMeasure', '1'); } catch {}
     if (semantic) measureSemantic();
     else gridAutoMeasure();
   };
@@ -56,9 +57,10 @@ const DEFAULT_HIDDEN = {
 
 function onModel(model) {
   semantic = detect(model);
+  const autoPref = (() => { try { return localStorage.getItem('ps:autoMeasure') !== '0'; } catch { return true; } })();
   if (!semantic) {
     roomCenters.length = 0;
-    gridAutoMeasure();   // non-semantic GLBs still get automatic room areas
+    if (autoPref) gridAutoMeasure();   // non-semantic GLBs still get automatic room areas
     return;
   }
   {
@@ -73,7 +75,8 @@ function onModel(model) {
     editor.registerScanObjects(semantic);
     catalog.buildScanSection();
     doors.setup(semantic);
-    measureSemantic();
+    measureSemantic();               // always computed — comparison metadata needs it
+    if (!autoPref) { clearAuto(); updateResults(); }   // …but respect the user's overlay preference
   }
 }
 
@@ -197,6 +200,12 @@ export function measureSemantic() {
   ctx.statusEl.textContent = t('status.plan', { n: measured.length, m2: total.toFixed(1) });
 
   // project-card metadata for the main menu
-  persist.get().meta = { area: total, rooms: measured.length, ts: Date.now() };
+  persist.get().meta = {
+    area: total, rooms: measured.length, ts: Date.now(),
+    roomList: measured.map(m => ({
+      name: roomNames[m.primary] || roomName(m.primary),
+      area: +m.area.toFixed(2),
+    })),
+  };
   persist.save();
 }

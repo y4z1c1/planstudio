@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
 import { CSS2DRenderer } from 'three/addons/renderers/CSS2DRenderer.js';
 import { ctx } from './ctx.js';
 import * as results from './results.js';
@@ -227,6 +228,9 @@ ctx.keyHooks.push(ev => {
 
 // ---------- model loading ----------
 const loader = new GLTFLoader();
+const dracoHouse = new DRACOLoader();
+dracoHouse.setDecoderPath('https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/libs/draco/gltf/');
+loader.setDRACOLoader(dracoHouse);
 const modelNameEl = document.getElementById('model-name');
 
 // stateKey lets forks/design-variants share one GLB while keeping separate

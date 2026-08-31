@@ -35,6 +35,9 @@ export function init(c) {
   fileInput = document.getElementById('file-input');
 
   document.getElementById('brand').onclick = showMenu;
+  document.getElementById('btn-compare').onclick = openCompare;
+  document.getElementById('cmp-close').onclick = () =>
+    document.getElementById('cmp-overlay').classList.remove('show');
   fileInput.addEventListener('change', () => {
     const f = fileInput.files[0];
     if (f) importFile(f);
@@ -136,6 +139,91 @@ function setName(modelName, label) {
 
 function displayName(modelName, fallback) {
   return names()[modelName] || fallback;
+}
+
+// ---------- comparison ----------
+async function allProjects() {
+  const list = [];
+  for (const b of BUILTIN) list.push({ key: b.file, label: displayName(b.file, b.labelKey ? t(b.labelKey) : b.label) });
+  for (const p of PRESETS) list.push({ key: p.state, label: displayName(p.state, p.label) });
+  for (const f of forks()) list.push({ key: f.key, label: displayName(f.key, f.label) });
+  let models = [];
+  try { models = await idbList(); } catch {}
+  for (const m of models) list.push({ key: m.name, label: displayName(m.name, m.name.replace(/\.glb$/i, '')) });
+  return list;
+}
+
+function stateOf(key) {
+  try { return JSON.parse(localStorage.getItem('fp:v1:' + key)); } catch { return null; }
+}
+
+const cmpSelected = new Set();
+
+async function openCompare() {
+  const overlay = document.getElementById('cmp-overlay');
+  const pick = document.getElementById('cmp-pick');
+  pick.innerHTML = '';
+  const projects = await allProjects();
+  for (const p of projects) {
+    const st = stateOf(p.key);
+    const chip = document.createElement('div');
+    chip.className = 'cmp-chip' + (st?.meta ? '' : ' disabled') + (cmpSelected.has(p.key) ? ' on' : '');
+    chip.textContent = p.label + (st?.meta ? ` · ${st.meta.area.toFixed(1)} m²` : ` · ${t('cmp.notOpened')}`);
+    if (st?.meta) {
+      chip.onclick = () => {
+        cmpSelected.has(p.key) ? cmpSelected.delete(p.key) : cmpSelected.add(p.key);
+        chip.classList.toggle('on');
+        renderCompareTable(projects);
+      };
+    }
+    pick.appendChild(chip);
+  }
+  renderCompareTable(projects);
+  overlay.classList.add('show');
+}
+
+function renderCompareTable(projects) {
+  const el = document.getElementById('cmp-table');
+  const sel = projects.filter(p => cmpSelected.has(p.key) && stateOf(p.key)?.meta);
+  if (sel.length < 2) { el.innerHTML = ''; return; }
+  const states = sel.map(p => ({ p, st: stateOf(p.key) }));
+  // union of room names, ordered by biggest area anywhere
+  const roomNames = [];
+  for (const { st } of states) {
+    for (const r of st.meta.roomList || []) {
+      if (!roomNames.includes(r.name)) roomNames.push(r.name);
+    }
+  }
+  const areaOf = (st, name) => (st.meta.roomList || []).find(r => r.name === name)?.area;
+  roomNames.sort((a, b) =>
+    Math.max(...states.map(({ st }) => areaOf(st, b) || 0)) -
+    Math.max(...states.map(({ st }) => areaOf(st, a) || 0)));
+
+  const cell = (vals, i, fmt) => {
+    const v = vals[i];
+    if (v == null) return '<td>—</td>';
+    const best = v === Math.max(...vals.filter(x => x != null));
+    return `<td class="${best && vals.filter(x => x != null).length > 1 ? 'best' : ''}">${fmt(v)}</td>`;
+  };
+  const m2 = v => v.toFixed(1) + ' m²';
+  let html = '<table><tr><th></th>' + states.map(({ p }) => `<th>${p.label}</th>`).join('') + '</tr>';
+  for (const name of roomNames) {
+    const vals = states.map(({ st }) => areaOf(st, name) ?? null);
+    html += `<tr><td>${name}</td>` + states.map((_, i) => cell(vals, i, m2)).join('') + '</tr>';
+  }
+  {
+    const vals = states.map(({ st }) => st.meta.rooms);
+    html += `<tr><td>${t('cmp.roomCount')}</td>` + states.map((_, i) => cell(vals, i, v => v)).join('') + '</tr>';
+  }
+  {
+    const vals = states.map(({ st }) => (st.furniture?.length || 0) + (st.clones?.length || 0));
+    html += `<tr><td>${t('cmp.furniture')}</td>` + states.map((_, i) => cell(vals, i, v => v)).join('') + '</tr>';
+  }
+  {
+    const vals = states.map(({ st }) => st.meta.area);
+    html += `<tr class="total"><td>${t('cmp.total')}</td>` + states.map((_, i) => cell(vals, i, m2)).join('') + '</tr>';
+  }
+  el.innerHTML = html + '</table>';
 }
 
 // ---------- fork ----------

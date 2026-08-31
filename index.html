@@ -285,6 +285,38 @@
   .proj-card.new:hover { color: var(--accent); }
   .proj-card.new svg { width: 22px; height: 22px; }
   #menu-note { margin-top: 36px; color: var(--muted); font-size: 11.5px; line-height: 1.7; }
+
+  /* ---------- compare modal ---------- */
+  #cmp-overlay {
+    position: absolute; inset: 0; z-index: 80; display: none;
+    align-items: flex-start; justify-content: center;
+    background: rgba(10,11,14,.7); overflow-y: auto; padding: 60px 20px;
+  }
+  #cmp-overlay.show { display: flex; }
+  #cmp-panel {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 12px;
+    padding: 16px; width: min(860px, 100%);
+  }
+  #cmp-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+  #cmp-head h3 { font-size: 14px; font-weight: 600; }
+  #cmp-pick { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
+  .cmp-chip {
+    display: flex; align-items: center; gap: 6px;
+    background: var(--panel2); border: 1px solid var(--border); border-radius: 20px;
+    padding: 5px 12px; font-size: 12px; cursor: pointer; user-select: none;
+  }
+  .cmp-chip.on { border-color: var(--accent); color: #fff; background: rgba(61,126,255,.12); }
+  .cmp-chip.disabled { opacity: .45; cursor: not-allowed; }
+  #cmp-table { overflow-x: auto; }
+  #cmp-table table { border-collapse: collapse; width: 100%; font-size: 12.5px; }
+  #cmp-table th, #cmp-table td {
+    padding: 7px 10px; border-bottom: 1px solid var(--border); text-align: right;
+    font-variant-numeric: tabular-nums; white-space: nowrap;
+  }
+  #cmp-table th { color: var(--muted); font-weight: 600; font-size: 11px; }
+  #cmp-table th:first-child, #cmp-table td:first-child { text-align: left; }
+  #cmp-table td.best { color: var(--green); font-weight: 600; }
+  #cmp-table tr.total td { border-top: 1px solid var(--border); font-weight: 600; }
 </style>
 </head>
 <body>
@@ -401,9 +433,23 @@
       </div>
       <div id="lang-sw-menu"></div>
     </div>
-    <h2 data-i18n="menu.projects">Projeler</h2>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+      <h2 data-i18n="menu.projects" style="margin-bottom:0">Projeler</h2>
+      <button class="btn" id="btn-compare" style="width:auto;border-color:var(--border)"><svg class="ico"><use href="#i-scan"/></svg><span class="lbl" data-i18n="menu.compare">Karşılaştır</span></button>
+    </div>
     <div id="project-grid"></div>
     <div id="menu-note" data-i18n="menu.note"></div>
+  </div>
+</div>
+
+<div id="cmp-overlay">
+  <div id="cmp-panel">
+    <div id="cmp-head">
+      <h3 data-i18n="cmp.title">Proje karşılaştırma</h3>
+      <button class="btn" id="cmp-close" style="width:auto;padding:4px 8px"><svg class="ico"><use href="#i-x"/></svg></button>
+    </div>
+    <div id="cmp-pick"></div>
+    <div id="cmp-table"></div>
   </div>
 </div>
 
