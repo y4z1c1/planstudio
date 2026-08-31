@@ -153,7 +153,7 @@ export function init(c) {
     st.doorsVersion = 0;
     st.defaultsApplied = false;
     persist.save();
-    setTimeout(() => location.reload(), 400);
+    setTimeout(() => ctx.reloadToProject(), 400);
   };
 
   // right-click context menu on editable objects
@@ -632,7 +632,7 @@ function renderHistory() {
     const current = i === h.length - 1 ? t('history.now') : '';
     row.innerHTML = `<span>${time}${current}</span><span class="dims">${persist.describe(entry)}</span>`;
     if (!current) {
-      row.onclick = () => { if (persist.restore(i)) location.reload(); };
+      row.onclick = () => { if (persist.restore(i)) ctx.reloadToProject(); };
     }
     list.prepend(row);
   });

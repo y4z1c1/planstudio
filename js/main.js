@@ -152,11 +152,18 @@ renderer.domElement.addEventListener('pointerup', ev => {
 renderer.domElement.addEventListener('dblclick', ev => {
   for (const h of ctx.dblHooks) if (h(ev)) return;
 });
+// undo/restore work by reloading with reverted storage; remember the open
+// project so the reload returns to it instead of the main menu
+ctx.reloadToProject = () => {
+  try { sessionStorage.setItem('ps:reopen', ctx.modelName || ''); } catch {}
+  location.reload();
+};
+
 addEventListener('keydown', ev => {
   if (ev.target.tagName === 'INPUT') return;
   if ((ev.metaKey || ev.ctrlKey) && (ev.key === 'z' || ev.key === 'Z')) {
     ev.preventDefault();
-    if (persist.undo()) location.reload();
+    if (ctx.modelName && persist.undo()) ctx.reloadToProject();
     return;
   }
   for (const h of ctx.keyHooks) if (h(ev)) return;

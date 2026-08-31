@@ -27,6 +27,37 @@ export function init(c) {
   });
 
   render();
+
+  // an undo / history-restore reload marked the project to return to —
+  // reopen it directly instead of landing on the menu
+  let reopen = null;
+  try {
+    reopen = sessionStorage.getItem('ps:reopen');
+    sessionStorage.removeItem('ps:reopen');
+  } catch {}
+  // defer past main.js module evaluation — ctx.loadModel is assigned after
+  // the module init calls
+  if (reopen) queueMicrotask(() => openByName(reopen));
+}
+
+async function openByName(name) {
+  if (BUILTIN.some(b => b.file === name)) {
+    hideMenu();
+    ctx.loadModel(name, name, false);
+    return;
+  }
+  try {
+    const db = await openDB();
+    const rec = await new Promise((res, rej) => {
+      const req = db.transaction(STORE).objectStore(STORE).get(name);
+      req.onsuccess = () => res(req.result);
+      req.onerror = () => rej(req.error);
+    });
+    if (rec?.blob) {
+      hideMenu();
+      openBlob(rec.blob, rec.name);
+    }
+  } catch {}
 }
 
 export function showMenu() {
