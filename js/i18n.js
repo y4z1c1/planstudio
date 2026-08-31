@@ -95,6 +95,9 @@ const STRINGS = {
     'k.table': 'Yemek masası', 'k.fridge': 'Buzdolabı', 'k.washer': 'Çamaşır makinesi',
     'k.toilet': 'Klozet', 'k.sink': 'Lavabo', 'k.tv': 'TV ünitesi', 'k.nightstand': 'Komodin',
     'k.bookcase': 'Kitaplık',
+    'k.tv45': '45\u2033 TV', 'k.tv55': '55\u2033 TV', 'k.tv65': '65\u2033 TV',
+    'k.laptop': 'MacBook / Laptop', 'k.monitor': 'Monitör 27\u2033',
+    'k.mirror': 'Ayaklı boy aynası (oval)',
   },
   en: {
     'app.subtitle': '3D floor-plan viewer, m² measurement and furniture fitting',
@@ -190,6 +193,9 @@ const STRINGS = {
     'k.table': 'Dining table', 'k.fridge': 'Fridge', 'k.washer': 'Washing machine',
     'k.toilet': 'Toilet', 'k.sink': 'Sink', 'k.tv': 'TV stand', 'k.nightstand': 'Nightstand',
     'k.bookcase': 'Bookcase',
+    'k.tv45': '45\u2033 TV', 'k.tv55': '55\u2033 TV', 'k.tv65': '65\u2033 TV',
+    'k.laptop': 'MacBook / Laptop', 'k.monitor': '27\u2033 Monitor',
+    'k.mirror': 'Standing arch mirror',
   },
 };
 

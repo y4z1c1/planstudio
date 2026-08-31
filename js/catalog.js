@@ -33,6 +33,11 @@ const KENNEY = [
   { id: 'kenney:tv',               key: 'k.tv',          file: 'cabinetTelevision.glb', target: 1.50, scaleBy: 'w' },
   { id: 'kenney:nightstand',       key: 'k.nightstand',  file: 'cabinetBedDrawer.glb', target: 0.45, scaleBy: 'w' },
   { id: 'kenney:bookcase',         key: 'k.bookcase',    file: 'bookcaseOpen.glb',     target: 1.80, scaleBy: 'h' },
+  { id: 'kenney:tv45',             key: 'k.tv45',        file: 'televisionModern.glb', target: 1.00, scaleBy: 'w' },
+  { id: 'kenney:tv55',             key: 'k.tv55',        file: 'televisionModern.glb', target: 1.22, scaleBy: 'w' },
+  { id: 'kenney:tv65',             key: 'k.tv65',        file: 'televisionModern.glb', target: 1.44, scaleBy: 'w' },
+  { id: 'kenney:laptop',           key: 'k.laptop',      file: 'laptop.glb',           target: 0.30, scaleBy: 'w' },
+  { id: 'kenney:monitor',          key: 'k.monitor',     file: 'computerScreen.glb',   target: 0.61, scaleBy: 'w' },
 ];
 
 const BOXES = [
@@ -114,6 +119,10 @@ export function init(c) {
     item(t(def.key), dimTxt, () => spawnKenney(def).catch(() => spawnBoxFallback(def.key)));
   });
 
+  Object.entries(PROC).forEach(([id, def]) => {
+    item(t(def.key), def.dims, () => spawnProc(id));
+  });
+
   scanSectionEl = document.createElement('div');
   furnListEl.appendChild(scanSectionEl);
 
@@ -138,6 +147,10 @@ export function init(c) {
     for (const rec of persist.get().furniture) {
       if (rec.catalogId?.startsWith('user:')) {
         spawnUser(rec.catalogId.slice(5), rec);
+        continue;
+      }
+      if (rec.catalogId?.startsWith('proc:')) {
+        spawnProc(rec.catalogId, rec);
         continue;
       }
       const def = kenneyById.get(rec.catalogId);
@@ -230,6 +243,10 @@ function duplicateCatalogItem(obj) {
     spawnUser(obj.userData.catalogId.slice(5));
     return true;
   }
+  if (obj.userData.catalogId?.startsWith('proc:')) {
+    spawnProc(obj.userData.catalogId);
+    return true;
+  }
   const def = kenneyById.get(obj.userData.catalogId);
   if (!def) return null;
   loadTemplate(def).then(tpl => {
@@ -252,6 +269,78 @@ function duplicateCatalogItem(obj) {
 function spawnBoxFallback(key) {
   const f = BOXES.find(b => b.key === key) || BOXES[0];
   spawnBox(f);
+}
+
+// ---------- procedural items (no GLB source) ----------
+// arch floor mirror, 100×180, thin black metal frame, leaning slightly back
+function buildMirror() {
+  const W = 1.0, H = 1.8, T = 0.035, D = 0.03;
+  const arch = inset => {
+    const w2 = W / 2 - inset, top = H - inset, r = w2;
+    const sh = new THREE.Shape();
+    sh.moveTo(-w2, inset);
+    sh.lineTo(-w2, top - r);
+    sh.absarc(0, top - r, r, Math.PI, 0, true);
+    sh.lineTo(w2, inset);
+    sh.closePath();
+    return sh;
+  };
+  const frameShape = arch(0);
+  frameShape.holes.push(arch(T));
+  const g = new THREE.Group();
+  const lean = new THREE.Group();
+  const frame = new THREE.Mesh(
+    new THREE.ExtrudeGeometry(frameShape, { depth: D, bevelEnabled: false }),
+    new THREE.MeshStandardMaterial({ color: 0x15151a, metalness: 0.7, roughness: 0.35 }));
+  lean.add(frame);
+  const glass = new THREE.Mesh(
+    new THREE.ShapeGeometry(arch(T)),
+    new THREE.MeshStandardMaterial({ color: 0xaebfca, metalness: 1.0, roughness: 0.05 }));
+  glass.position.z = D / 2;
+  lean.add(glass);
+  const legMat = new THREE.MeshStandardMaterial({ color: 0x15151a, metalness: 0.7, roughness: 0.35 });
+  for (const sx of [-1, 1]) {
+    const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.011, 0.011, 0.5, 8), legMat);
+    leg.position.set(sx * (W / 2 - 0.06), 0.22, -0.14);
+    leg.rotation.x = 0.55;
+    lean.add(leg);
+  }
+  lean.rotation.x = -0.09;   // leans back like the real thing
+  g.add(lean);
+  return g;
+}
+
+const PROC = {
+  'proc:mirror': { key: 'k.mirror', build: buildMirror, dims: '100×180' },
+};
+
+function spawnProc(id, rec = null) {
+  const def = PROC[id];
+  if (!def) return null;
+  const m = def.build();
+  m.userData = { catalogId: id, label: t(def.key) };
+  m.add(makeTextLabel(t(def.key), new THREE.Vector3(0, 1.95, 0), '#cdd2da', 'furn-label'));
+  const floorY = ctx.modelBox ? ctx.modelBox.min.y : 0;
+  ctx.scene.add(m);
+  editor.register(m);
+  if (rec) {
+    m.position.fromArray(rec.pos);
+    m.rotation.y = rec.rotY || 0;
+    m.userData.rec = rec;
+    m.userData.recList = persist.get().furniture;
+    return m;
+  }
+  m.position.set(ctx.controls.target.x, floorY, ctx.controls.target.z);
+  editor.startPlacing(m, {
+    onPlace: obj => {
+      const r = { catalogId: id, pos: obj.position.toArray(), rotY: obj.rotation.y };
+      persist.get().furniture.push(r);
+      obj.userData.rec = r;
+      obj.userData.recList = persist.get().furniture;
+      persist.save();
+    },
+  });
+  return m;
 }
 
 // ---------- user-imported furniture (GLB upload + IKEA) ----------
