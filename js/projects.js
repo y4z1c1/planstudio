@@ -12,13 +12,7 @@ const BUILTIN = [
   { file: 'nisantasi-1p1.glb', label: 'Nişantaşı 1+1' },
 ];
 // design-suggestion variants: same GLB, separate state, seeded from a preset
-// design suggestions built from the user's own exported layout: same rooms,
-// same furniture — only rearranged
-const PRESETS = [
-  { file: 'nisantasi-1p1.glb', state: 'nisantasi-user-a', label: 'Nişantaşı · Öneri A — Sinema hattı', preset: 'presets/nisantasi-user-a.json' },
-  { file: 'nisantasi-1p1.glb', state: 'nisantasi-user-b', label: 'Nişantaşı · Öneri B — Sohbet düzeni', preset: 'presets/nisantasi-user-b.json' },
-  { file: 'nisantasi-1p1.glb', state: 'nisantasi-user-c', label: 'Nişantaşı · Öneri C — Manzara düzeni', preset: 'presets/nisantasi-user-c.json' },
-];
+const PRESETS = [];
 const FORKS_KEY = 'ps:forks';
 function forks() {
   try { return JSON.parse(localStorage.getItem(FORKS_KEY)) || []; } catch { return []; }
