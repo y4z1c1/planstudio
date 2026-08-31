@@ -20,7 +20,7 @@ const wrap = document.getElementById('canvas-wrap');
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x16181d);
 
-const camera = new THREE.PerspectiveCamera(60, innerWidth / innerHeight, 0.01, 500);
+const camera = new THREE.PerspectiveCamera(60, (innerWidth / innerHeight) || 16 / 9, 0.01, 500);
 camera.position.set(4, 5, 4);
 
 const renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -318,6 +318,7 @@ document.getElementById('btn-persp').onclick = () => {
 
 // ---------- loop ----------
 addEventListener('resize', () => {
+  if (!innerWidth || !innerHeight) return;   // hidden/zero-sized viewport
   camera.aspect = innerWidth / innerHeight;
   camera.updateProjectionMatrix();
   renderer.setSize(innerWidth, innerHeight);

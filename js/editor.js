@@ -77,6 +77,52 @@ function constrainXZ(obj, tx, tz) {
   obj.position.z = pz;
 }
 
+// ---------- surface-aware placement ----------
+// Raycast under the cursor/crosshair: an upward face (table top, cabinet,
+// floor) seats the object on it; a vertical face mounts wall-mountable
+// objects (TVs) onto the wall. Returns false when the old floor-plane path
+// should handle the move instead.
+const _sn = new THREE.Vector3();
+const _sSize = new THREE.Vector3();
+
+function placeAt(obj) {
+  const targets = [];
+  if (ctx.model) targets.push(ctx.model);
+  for (const o of placed) {
+    if (o !== obj && o.visible && o.parent) targets.push(o);
+  }
+  const hits = ctx.raycaster.intersectObjects(targets, true);
+  for (const h of hits) {
+    if (!h.object.visible || !h.face) continue;
+    let p = h.object, own = false;
+    while (p) { if (p === obj) { own = true; break; } p = p.parent; }
+    if (own) continue;
+    _sn.copy(h.face.normal).transformDirection(h.object.matrixWorld);
+    if (_sn.y > 0.5) {
+      // seat on top of the surface under the cursor
+      obj.position.y = h.point.y;
+      constrainXZ(obj, h.point.x, h.point.z);
+      return true;
+    }
+    if (Math.abs(_sn.y) < 0.3 && obj.userData.wallMount) {
+      // mount on the wall, centered at the aim point
+      if (_sn.dot(ctx.raycaster.ray.direction) > 0) _sn.negate();
+      obj.rotation.y = Math.atan2(_sn.x, _sn.z);
+      new THREE.Box3().setFromObject(obj).getSize(_sSize);
+      const halfD = (Math.abs(_sn.x) * _sSize.x + Math.abs(_sn.z) * _sSize.z) / 2;
+      const minY = (ctx.modelBox ? ctx.modelBox.min.y : 0) + 0.05;
+      obj.position.set(
+        h.point.x + _sn.x * (halfD + 0.005),
+        Math.max(minY, h.point.y - _sSize.y / 2),
+        h.point.z + _sn.z * (halfD + 0.005),
+      );
+      return true;
+    }
+    return false;   // hit something unusable first (e.g. wall for a sofa)
+  }
+  return false;
+}
+
 // hover state
 let hoverObj = null;
 let hoverHelper = null;
@@ -230,6 +276,7 @@ function finishPlacing() {
 
 function movePlacing(ev) {
   ctx.setNDC(ev);
+  if (placeAt(placing.obj)) { checkCollisions(); return; }
   floorPlane.constant = -placing.obj.position.y;
   const hit = new THREE.Vector3();
   if (ctx.raycaster.ray.intersectPlane(floorPlane, hit)) {
@@ -247,6 +294,10 @@ const _aimHit = new THREE.Vector3();
 export function placingAim(origin, dir) {
   if (!placing) return;
   const obj = placing.obj;
+  ctx.raycaster.set(origin, dir);
+  ctx.raycaster.near = 0;
+  ctx.raycaster.far = 8;
+  if (placeAt(obj)) return;
   floorPlane.constant = -obj.position.y;
   _aimRay.set(origin, dir);
   let target = null;
@@ -440,6 +491,12 @@ function onPointerMove(ev) {
   if (placing) { movePlacing(ev); return true; }
   if (dragging) {
     ctx.setNDC(ev);
+    if (placeAt(dragging)) {
+      refreshHighlight();
+      checkCollisions();
+      return true;
+    }
+    floorPlane.constant = -dragging.position.y;
     const hit = new THREE.Vector3();
     if (ctx.raycaster.ray.intersectPlane(floorPlane, hit)) {
       constrainXZ(dragging, hit.x + dragOffset.x, hit.z + dragOffset.z);

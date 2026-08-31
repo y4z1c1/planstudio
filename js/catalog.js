@@ -33,9 +33,9 @@ const KENNEY = [
   { id: 'kenney:tv',               key: 'k.tv',          file: 'cabinetTelevision.glb', target: 1.50, scaleBy: 'w' },
   { id: 'kenney:nightstand',       key: 'k.nightstand',  file: 'cabinetBedDrawer.glb', target: 0.45, scaleBy: 'w' },
   { id: 'kenney:bookcase',         key: 'k.bookcase',    file: 'bookcaseOpen.glb',     target: 1.80, scaleBy: 'h' },
-  { id: 'kenney:tv45',             key: 'k.tv45',        file: 'televisionModern.glb', target: 1.00, scaleBy: 'w' },
-  { id: 'kenney:tv55',             key: 'k.tv55',        file: 'televisionModern.glb', target: 1.22, scaleBy: 'w' },
-  { id: 'kenney:tv65',             key: 'k.tv65',        file: 'televisionModern.glb', target: 1.44, scaleBy: 'w' },
+  { id: 'kenney:tv45',             key: 'k.tv45',        file: 'televisionModern.glb', target: 1.00, scaleBy: 'w', wallMount: true },
+  { id: 'kenney:tv55',             key: 'k.tv55',        file: 'televisionModern.glb', target: 1.22, scaleBy: 'w', wallMount: true },
+  { id: 'kenney:tv65',             key: 'k.tv65',        file: 'televisionModern.glb', target: 1.44, scaleBy: 'w', wallMount: true },
   { id: 'kenney:laptop',           key: 'k.laptop',      file: 'laptop.glb',           target: 0.30, scaleBy: 'w' },
   { id: 'kenney:monitor',          key: 'k.monitor',     file: 'computerScreen.glb',   target: 0.61, scaleBy: 'w' },
 ];
@@ -203,7 +203,7 @@ function loadTemplate(def) {
 
 function buildKenney(tpl, def) {
   const m = tpl.root.clone(true);
-  m.userData = { catalogId: def.id, label: t(def.key), sharedGeo: true };
+  m.userData = { catalogId: def.id, label: t(def.key), sharedGeo: true, wallMount: !!def.wallMount };
   m.add(makeTextLabel(
     `${t(def.key)} ${Math.round(tpl.w * 100)}×${Math.round(tpl.d * 100)}`,
     new THREE.Vector3(0, tpl.h + 0.15, 0), '#cdd2da', 'furn-label'));
