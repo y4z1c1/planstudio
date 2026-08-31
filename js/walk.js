@@ -1,14 +1,19 @@
 import * as THREE from 'three';
 import * as semantic from './semantic.js';
 import * as doorsMod from './doors.js';
+import * as editor from './editor.js';
 
 // Game-style first-person mode: pointer-lock mouse look (Minecraft POV),
-// WASD/arrows + collision against walls and closed doors, crosshair,
+// WASD/arrows + collision against walls, doors AND objects, crosshair,
 // E / click to open-close the door you're looking at, subtle head bob.
+// Gravity + Space jump: objects are solid but you can hop onto them
+// (beds, tables…) and walk off edges to fall back down.
 let ctx = null;
 export let active = false;
 
 const EYE = 1.6;
+const GRAVITY = -14;
+const JUMP_V = 4.9;        // ~0.85 m jump — clears beds and tables
 let yaw = 0, pitch = 0;
 const keys = new Set();
 let saved = null;
@@ -19,7 +24,9 @@ let btn = null;
 let crosshair = null, prompt = null;
 let aimedDoor = null;
 let bobT = 0;
+let feetY = 0, velY = 0, grounded = true;
 const rayc = new THREE.Raycaster();
+const DOWN = new THREE.Vector3(0, -1, 0);
 
 export function init(c) {
   ctx = c;
@@ -78,6 +85,11 @@ export function init(c) {
     if (!active) return false;
     if (ev.key === 'Escape') { exit(); return true; }
     if (ev.key === 'e' || ev.key === 'E') { interact(); return true; }
+    if (ev.key === ' ') {
+      ev.preventDefault();
+      if (grounded) { velY = JUMP_V; grounded = false; }
+      return true;
+    }
     const k = normKey(ev.key);
     if (k) { ev.preventDefault(); keys.add(k); return true; }
     return false;
@@ -133,13 +145,16 @@ function enter() {
     }
     sx = best.centroid.x; sz = best.centroid.z;
   }
-  ctx.camera.position.set(sx, ctx.modelBox.min.y + EYE, sz);
+  feetY = ctx.modelBox.min.y;
+  velY = 0;
+  grounded = true;
+  ctx.camera.position.set(sx, feetY + EYE, sz);
   ctx.controls.enabled = false;
   active = true;
   applyLook();
   btn.classList.add('active');
   crosshair.style.display = 'block';
-  ctx.statusEl.textContent = 'WASD/ok = yürü · fare = bak · E / tık = kapı · Shift = koş · Esc = çık';
+  ctx.statusEl.textContent = 'WASD/ok = yürü · fare = bak · Space = zıpla · E / tık = kapı · Shift = koş · Esc = çık';
   requestLock();
 }
 
@@ -174,13 +189,15 @@ function interact() {
   if (aimedDoor) doorsMod.toggleDoor(aimedDoor);
 }
 
-// blocking geometry: walls + doorway groups (open panels swing clear of the ray)
+// blocking geometry: walls, doorway groups AND every placed/scanned object —
+// furniture is solid; you jump on top of it instead of walking through
 function colliders() {
   const list = [];
   const sem = semantic.semantic;
   if (sem?.wallsGroup) list.push(sem.wallsGroup);
   else if (ctx.model) list.push(ctx.model);
   for (const d of doorsMod.doorObjects) if (d.parent) list.push(d);
+  for (const o of editor.placed) if (o.visible && o.parent) list.push(o);
   return list;
 }
 
@@ -191,10 +208,31 @@ function blocked(from, dir, dist) {
   return rayc.intersectObjects(colliders(), true).some(h => h.object.visible);
 }
 
+// highest walkable surface under the player (floors, furniture tops, stairs of
+// stuff) — sampled by a downward ray from just above the head
+function groundHeight() {
+  const origin = new THREE.Vector3(ctx.camera.position.x, feetY + EYE + 0.3, ctx.camera.position.z);
+  rayc.set(origin, DOWN);
+  rayc.near = 0;
+  rayc.far = EYE + 4;
+  const targets = [];
+  if (ctx.model) targets.push(ctx.model);
+  for (const o of editor.placed) if (o.visible && o.parent) targets.push(o);
+  const hits = rayc.intersectObjects(targets, true);
+  for (const h of hits) {
+    if (!h.object.visible) continue;
+    // only surfaces near or below the feet count — ceilings and lintels above
+    // the player must not become "ground" mid-jump; 15 cm doubles as step-up
+    if (h.point.y <= feetY + 0.15) return h.point.y;
+  }
+  return ctx.modelBox.min.y;
+}
+
 function tick(dt) {
   if (!active) return;
 
-  // movement with wall collision (slide along blocked axes)
+  // horizontal movement — two rays (shin + torso) relative to current feet
+  // height, so a jump that lifts you above an object lets you glide onto it
   if (keys.size) {
     const speed = (keys.has('shift') ? 3.6 : 1.9) * dt;
     const fwd = new THREE.Vector3(-Math.sin(yaw), 0, -Math.cos(yaw));
@@ -206,12 +244,12 @@ function tick(dt) {
     if (keys.has('r')) move.add(right);
     if (move.lengthSq() > 0) {
       move.normalize().multiplyScalar(speed);
-      const feet = ctx.camera.position.clone();
-      feet.y = ctx.modelBox.min.y + 1.0;
+      const shin = new THREE.Vector3(ctx.camera.position.x, feetY + 0.35, ctx.camera.position.z);
+      const torso = new THREE.Vector3(ctx.camera.position.x, feetY + 1.25, ctx.camera.position.z);
       const tryMove = v => {
         if (v.lengthSq() < 1e-10) return false;
         const d = v.clone().normalize();
-        if (blocked(feet, d, 0.35)) return false;
+        if (blocked(shin, d, 0.35) || blocked(torso, d, 0.35)) return false;
         ctx.camera.position.x += v.x;
         ctx.camera.position.z += v.z;
         return true;
@@ -222,10 +260,25 @@ function tick(dt) {
       const b = ctx.modelBox;
       ctx.camera.position.x = Math.max(b.min.x + 0.25, Math.min(b.max.x - 0.25, ctx.camera.position.x));
       ctx.camera.position.z = Math.max(b.min.z + 0.25, Math.min(b.max.z - 0.25, ctx.camera.position.z));
-      bobT += dt * (keys.has('shift') ? 11 : 8);
+      if (grounded) bobT += dt * (keys.has('shift') ? 11 : 8);
     }
   }
-  ctx.camera.position.y = ctx.modelBox.min.y + EYE + Math.sin(bobT) * 0.028;
+
+  // vertical physics: gravity, jumping, landing on whatever is underfoot
+  const ground = groundHeight();
+  if (grounded && feetY > ground + 0.02) grounded = false;   // walked off an edge
+  if (!grounded) {
+    velY += GRAVITY * dt;
+    feetY += velY * dt;
+    if (velY <= 0 && feetY <= ground) {
+      feetY = ground;
+      velY = 0;
+      grounded = true;
+    }
+  } else {
+    feetY = ground;
+  }
+  ctx.camera.position.y = feetY + EYE + (grounded ? Math.sin(bobT) * 0.028 : 0);
   applyLook();
 
   // door aim detection from screen center

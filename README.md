@@ -16,7 +16,7 @@ Scan your home with [Polycam](https://poly.cam), export it as GLB, drop it into 
 - **Scan-object editing** — every scanned object (beds, fridge, cabinets, doors…) is selectable: drag to move, `R` rotate, `D` duplicate, `Delete` hide. World-baked geometry is re-pivoted on load so objects rotate around their own base.
 - **Furniture catalog** — 17 metric-normalized [Kenney Furniture Kit](https://kenney.nl/assets/furniture-kit) models (CC0), clones of the scan's own objects, and parametric fallback blocks. Overlapping blocks tint red.
 - **Door repair** — rooms scanned without doors get one automatically: rays swept along the wall line find the opening, a real doorway model (with wall in-fill above/beside it) is placed in the gap. A "Kapı Ekle" mode adds doors to any wall by clicking.
-- **Walk mode (game-style)** — pointer-lock mouse look with crosshair, WASD/arrow movement with wall collision and slide, doors open/close with `E` (hinged swing animation), spawn at the nearest room center, head bob, sprint with Shift.
+- **Walk mode (game-style)** — pointer-lock mouse look with crosshair, WASD/arrow movement with wall collision and slide, doors open/close with `E` (hinged swing animation), spawn at the nearest room center, head bob, sprint with Shift. Furniture is solid: gravity + `Space` jump let you hop onto beds and tables and walk off edges.
 - **Outdoor environment** — sky dome, grass, procedural trees and flowers, animated butterflies; scan window quads are replaced with framed glass windows.
 - **Versioned persistence** — all edits (room names, moved/hidden objects, clones, doors, furniture) are stored per project in `localStorage` with a snapshot history: `Ctrl/⌘+Z` undoes, a history panel restores any of the last 40 states.
 - **Project manager** — a home screen lists your projects; dropped GLB files are stored in IndexedDB so they reopen without re-importing.
@@ -84,4 +84,4 @@ Fully static — GitHub Pages, Netlify or any static host works as-is (the Googl
 
 PlanStudio, Polycam ile taranmış evleri görüntüleyen, oda oda **kesin m² ölçen** ve gerçek ölçülerde mobilya yerleştirmeye yarayan bir web uygulaması. Ev ararken adayları kıyaslamak için yapıldı: her GLB bir proje olur; ölçümler, düzenlemeler ve mobilya yerleşimi tarayıcıda kalıcı saklanır, `Ctrl+Z` ile geri alınır.
 
-**Kullanım:** `python3 -m http.server 8741` → `http://localhost:8741`. GLB dosyanı pencereye sürükle. Kısayollar: `G` dolaşma modu (WASD + fare, `E` kapı aç/kapa), `R` döndür, `D` kopyala, `Delete` sil, `Ctrl/⌘+Z` geri al.
+**Kullanım:** `python3 -m http.server 8741` → `http://localhost:8741`. GLB dosyanı pencereye sürükle. Kısayollar: `G` dolaşma modu (WASD + fare, `Space` zıpla, `E` kapı aç/kapa), `R` döndür, `D` kopyala, `Delete` sil, `Ctrl/⌘+Z` geri al.
