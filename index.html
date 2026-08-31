@@ -330,6 +330,7 @@
   <symbol id="i-layers" viewBox="0 0 24 24"><path d="M12 3l9 5-9 5-9-5zM3.5 13.5L12 18l8.5-4.5"/></symbol>
   <symbol id="i-walk" viewBox="0 0 24 24"><circle cx="13" cy="4.5" r="1.8"/><path d="M13 8l-1.6 5.2L14 16l1 5M11.4 13.2L9 15.5 8 20M13 8l3.3 2.2 2.2 1.3"/></symbol>
   <symbol id="i-tree" viewBox="0 0 24 24"><path d="M12 3l4 5.5h-2.5L17 14H7l3.5-5.5H8zM12 14v7"/></symbol>
+  <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v2.5M12 19v2.5M2.5 12H5M19 12h2.5M4.9 4.9l1.8 1.8M17.3 17.3l1.8 1.8M19.1 4.9l-1.8 1.8M6.7 17.3l-1.8 1.8"/></symbol>
   <symbol id="i-top" viewBox="0 0 24 24"><path d="M4 4h16v16H4zM12 8.5V12m0 0h3.5M12 12H8.5m3.5 0v3.5"/></symbol>
   <symbol id="i-cube" viewBox="0 0 24 24"><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9zM12 12l8-4.5M12 12L4 7.5M12 12v9"/></symbol>
   <symbol id="i-edit" viewBox="0 0 24 24"><path d="M17 3.5l3.5 3.5L8 19.5H4.5V16zM13.5 7l3.5 3.5"/></symbol>
@@ -386,6 +387,18 @@
       <button class="btn" id="btn-persp"><svg class="ico"><use href="#i-cube"/></svg><span class="lbl" data-i18n="btn.free">Serbest</span><kbd>5</kbd></button>
       <button class="btn" id="btn-ceiling"><svg class="ico"><use href="#i-layers"/></svg><span class="lbl">Tavanı Göster</span><kbd>6</kbd></button>
       <button class="btn" id="btn-env"><svg class="ico"><use href="#i-tree"/></svg><span class="lbl" data-i18n="btn.env">Dış Ortam</span><kbd>7</kbd></button>
+      <button class="btn" id="btn-sun"><svg class="ico"><use href="#i-sun"/></svg><span class="lbl" data-i18n="btn.sun">Güneş Işığı</span></button>
+      <div class="hint" id="sun-panel">
+        <div style="display:flex;flex-direction:column;gap:7px;">
+          <input id="sun-date" type="date" style="background:var(--panel3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);font-family:inherit;font-size:12px;padding:5px 8px;outline:none;color-scheme:dark;">
+          <div style="display:flex;justify-content:space-between;font-size:11px;"><span data-i18n="sun.time">Saat</span><b id="sun-time-label">13:00</b></div>
+          <input id="sun-time" type="range" min="4" max="23" step="0.25" value="13" style="width:100%">
+          <div style="display:flex;justify-content:space-between;font-size:11px;"><span data-i18n="sun.north">Kuzey yönü</span></div>
+          <input id="sun-north" type="range" min="-180" max="180" step="5" value="0" style="width:100%">
+          <div id="sun-info" style="font-size:11px;color:var(--amber);"></div>
+          <div style="font-size:10.5px;" data-i18n="sun.hint">Kuzey kaydırıcısını, güneşin gerçekte battığı yön batıya denk gelene kadar çevir.</div>
+        </div>
+      </div>
       <button class="btn" id="btn-walk"><svg class="ico"><use href="#i-walk"/></svg><span class="lbl" data-i18n="btn.walk">Dolaş</span><kbd>G</kbd></button>
     </div>
   </div>

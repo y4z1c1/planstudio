@@ -14,6 +14,7 @@ import * as doors from './doors.js';
 import * as walk from './walk.js';
 import * as env from './env.js';
 import * as projects from './projects.js';
+import * as sun from './sun.js';
 import { t, lang, setLang, applyStatic } from './i18n.js';
 
 // ---------- scene bootstrap ----------
@@ -28,6 +29,8 @@ const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setSize(innerWidth, innerHeight);
 renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
 renderer.localClippingEnabled = true;
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 wrap.appendChild(renderer.domElement);
 
 const labelRenderer = new CSS2DRenderer();
@@ -48,6 +51,8 @@ scene.add(dir);
 const dir2 = new THREE.DirectionalLight(0xffffff, 0.6);
 dir2.position.set(-5, 8, -5);
 scene.add(dir2);
+
+ctx.lights = { ambient: scene.children.find(o=>o.isAmbientLight), dir, dir2 };
 
 const grid = new THREE.GridHelper(20, 40, 0x333845, 0x24272e);
 scene.add(grid);
@@ -196,6 +201,7 @@ doors.init(ctx);
 semantic.init(ctx);
 walk.init(ctx);
 env.init(ctx);
+sun.init(ctx);
 projects.init(ctx);
 
 // global shortcuts — registered last so walk/editor/measure get first pick;
