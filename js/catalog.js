@@ -3,7 +3,14 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { makeTextLabel } from './utils.js';
 import * as editor from './editor.js';
 import * as persist from './persist.js';
+import * as projects from './projects.js';
 import { t } from './i18n.js';
+
+// IKEA proxy (server/ikea-proxy.py). Same-origin in production; the deployed
+// proxy is used as fallback during local development.
+const IKEA_PROXY_BASE = location.hostname === 'plan.yusufanilyazici.com'
+  ? ''
+  : 'https://plan.yusufanilyazici.com';
 
 // Add panel: searchable catalog of Kenney GLB furniture, the door tool,
 // clones of scanned objects and parametric fallback blocks.
@@ -46,8 +53,10 @@ const BOXES = [
 let ctx = null;
 let furnListEl = null;
 let scanSectionEl = null;
+let userSectionEl = null;
 const kenneyById = new Map(KENNEY.map(d => [d.id, d]));
 const templateCache = new Map();
+const userTemplateCache = new Map();   // name -> Promise<{root,w,d,h}>
 const gltfLoader = new GLTFLoader();
 
 export function init(c) {
@@ -61,6 +70,41 @@ export function init(c) {
   doorItem.id = 'btn-door';
   doorItem.innerHTML = `<span>${t('catalog.door')}</span><span class="dims">86×205</span>`;
   furnListEl.appendChild(doorItem);
+
+  // ---- user imports: GLB upload + IKEA fetch ----
+  const upItem = document.createElement('div');
+  upItem.className = 'furn-item';
+  upItem.innerHTML = `<span>${t('catalog.upload')}</span><span class="dims">.glb</span>`;
+  const furnFile = document.createElement('input');
+  furnFile.type = 'file';
+  furnFile.accept = '.glb';
+  furnFile.style.display = 'none';
+  document.body.appendChild(furnFile);
+  upItem.onclick = () => furnFile.click();
+  furnFile.addEventListener('change', () => {
+    const f = furnFile.files[0];
+    if (f) importUserModel(f.name.replace(/\.glb$/i, ''), f);
+    furnFile.value = '';
+  });
+  furnListEl.appendChild(upItem);
+
+  const ikeaRow = document.createElement('div');
+  ikeaRow.style.cssText = 'display:flex;gap:4px;margin:2px 0;';
+  ikeaRow.innerHTML =
+    `<input id="ikea-input" type="text" placeholder="${t('catalog.ikeaPh')}" ` +
+    `style="flex:1;min-width:0;background:var(--panel2);border:1px solid var(--border);` +
+    `border-radius:var(--radius);color:var(--text);font-family:inherit;font-size:12px;padding:6px 9px;outline:none;">` +
+    `<button id="ikea-btn" class="btn" style="width:auto;padding:6px 10px;">${t('catalog.ikeaBtn')}</button>`;
+  furnListEl.appendChild(ikeaRow);
+  ikeaRow.querySelector('#ikea-btn').onclick = fetchIkea;
+  ikeaRow.querySelector('#ikea-input').addEventListener('keydown', ev => {
+    ev.stopPropagation();
+    if (ev.key === 'Enter') fetchIkea();
+  });
+
+  userSectionEl = document.createElement('div');
+  furnListEl.appendChild(userSectionEl);
+  renderUserSection();
 
   section(t('catalog.furniture'));
   KENNEY.forEach(def => {
@@ -92,11 +136,18 @@ export function init(c) {
 
   ctx.modelHooks.push(() => {
     for (const rec of persist.get().furniture) {
+      if (rec.catalogId?.startsWith('user:')) {
+        spawnUser(rec.catalogId.slice(5), rec);
+        continue;
+      }
       const def = kenneyById.get(rec.catalogId);
       if (!def) continue;
       spawnKenney(def, rec).catch(() => {});
     }
   });
+
+  // cross-project copy (editor context menu) drops exported objects here
+  ctx.importUserModel = importUserModel;
 }
 
 function section(label) {
@@ -175,6 +226,10 @@ async function spawnKenney(def, rec = null) {
 // context-menu / D-key duplicate for placed catalog furniture — the copy goes
 // through the click-to-place flow like everything else
 function duplicateCatalogItem(obj) {
+  if (obj.userData.catalogId?.startsWith('user:')) {
+    spawnUser(obj.userData.catalogId.slice(5));
+    return true;
+  }
   const def = kenneyById.get(obj.userData.catalogId);
   if (!def) return null;
   loadTemplate(def).then(tpl => {
@@ -197,6 +252,143 @@ function duplicateCatalogItem(obj) {
 function spawnBoxFallback(key) {
   const f = BOXES.find(b => b.key === key) || BOXES[0];
   spawnBox(f);
+}
+
+// ---------- user-imported furniture (GLB upload + IKEA) ----------
+async function importUserModel(name, blob, { spawn = true } = {}) {
+  try {
+    await projects.putFurnitureModel({ name, blob, addedAt: Date.now() });
+  } catch {}
+  userTemplateCache.delete(name);
+  renderUserSection();
+  ctx.statusEl.textContent = t('status.modelImported', { name });
+  if (spawn) spawnUser(name);
+}
+
+function loadUserTemplate(name) {
+  if (userTemplateCache.has(name)) return userTemplateCache.get(name);
+  const p = projects.getFurnitureModel(name).then(rec => {
+    if (!rec) throw new Error('missing');
+    const url = URL.createObjectURL(rec.blob);
+    return gltfLoader.loadAsync(url).finally(() => URL.revokeObjectURL(url));
+  }).then(gltf => {
+    const inner = gltf.scene;
+    const box = new THREE.Box3().setFromObject(inner);
+    const size = box.getSize(new THREE.Vector3());
+    const maxDim = Math.max(size.x, size.y, size.z);
+    // most furniture GLBs (IKEA included) are metric; centimeter-scaled
+    // exports show up as buildings — rescale those
+    if (maxDim > 10) inner.scale.setScalar(0.01);
+    const box2 = new THREE.Box3().setFromObject(inner);
+    const center = box2.getCenter(new THREE.Vector3());
+    inner.position.sub(new THREE.Vector3(center.x, box2.min.y, center.z));
+    const root = new THREE.Group();
+    root.add(inner);
+    const size2 = box2.getSize(new THREE.Vector3());
+    return { root, w: size2.x, d: size2.z, h: size2.y };
+  });
+  userTemplateCache.set(name, p);
+  return p;
+}
+
+async function spawnUser(name, rec = null) {
+  let tpl;
+  try {
+    tpl = await loadUserTemplate(name);
+  } catch {
+    ctx.statusEl.textContent = t('status.importFail', { name });
+    return null;
+  }
+  const m = tpl.root.clone(true);
+  m.userData = { catalogId: 'user:' + name, label: name, sharedGeo: true };
+  m.add(makeTextLabel(
+    `${name} ${Math.round(tpl.w * 100)}×${Math.round(tpl.d * 100)}`,
+    new THREE.Vector3(0, tpl.h + 0.15, 0), '#cdd2da', 'furn-label'));
+  const floorY = ctx.modelBox ? ctx.modelBox.min.y : 0;
+  if (rec) {
+    m.position.fromArray(rec.pos);
+    m.rotation.y = rec.rotY || 0;
+    m.userData.rec = rec;
+    m.userData.recList = persist.get().furniture;
+    ctx.scene.add(m);
+    editor.register(m);
+    return m;
+  }
+  m.position.set(ctx.controls.target.x, floorY, ctx.controls.target.z);
+  ctx.scene.add(m);
+  editor.register(m);
+  editor.startPlacing(m, {
+    onPlace: obj => {
+      const r = { catalogId: 'user:' + name, pos: obj.position.toArray(), rotY: obj.rotation.y };
+      persist.get().furniture.push(r);
+      obj.userData.rec = r;
+      obj.userData.recList = persist.get().furniture;
+      persist.save();
+    },
+  });
+  return m;
+}
+
+async function renderUserSection() {
+  userSectionEl.innerHTML = '';
+  let models = [];
+  try { models = await projects.listFurnitureModels(); } catch {}
+  if (!models.length) return;
+  const header = document.createElement('div');
+  header.className = 'furn-section';
+  header.textContent = t('catalog.user');
+  userSectionEl.appendChild(header);
+  models.sort((a, b) => (b.addedAt || 0) - (a.addedAt || 0));
+  for (const m of models) {
+    const div = document.createElement('div');
+    div.className = 'furn-item';
+    div.innerHTML = `<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${m.name}</span>` +
+      `<button class="del" style="background:none;border:none;color:var(--muted);cursor:pointer;font-family:inherit">✕</button>`;
+    div.onclick = () => spawnUser(m.name);
+    div.querySelector('.del').onclick = async ev => {
+      ev.stopPropagation();
+      if (!confirm(t('catalog.deleteModel', { name: m.name }))) return;
+      try { await projects.deleteFurnitureModel(m.name); } catch {}
+      userTemplateCache.delete(m.name);
+      renderUserSection();
+    };
+    userSectionEl.appendChild(div);
+  }
+}
+
+// parse an IKEA product URL / "804.889.64" / bare 8-digit article number
+function parseIkea(input) {
+  const s = input.trim();
+  const dotted = s.match(/(\d{3})\.(\d{3})\.(\d{2})/);
+  if (dotted) return { item: dotted[1] + dotted[2] + dotted[3] };
+  const url = s.match(/ikea\.[a-z.]+\/([a-z]{2})\/([a-z]{2})\/.*?(\d{8})/i);
+  if (url) return { item: url[3], cc: url[1], lc: url[2] };
+  const bare = s.match(/(\d{8})(?!\d)/);
+  if (bare) return { item: bare[1] };
+  return null;
+}
+
+async function fetchIkea() {
+  const input = document.getElementById('ikea-input');
+  const parsed = parseIkea(input.value);
+  if (!parsed) {
+    ctx.statusEl.textContent = t('status.ikeaFail');
+    return;
+  }
+  ctx.statusEl.textContent = t('status.ikeaFetching');
+  try {
+    const q = new URLSearchParams({ item: parsed.item });
+    if (parsed.cc) { q.set('cc', parsed.cc); q.set('lc', parsed.lc); }
+    const res = await fetch(`${IKEA_PROXY_BASE}/api/ikea/model?${q}`);
+    if (!res.ok) throw new Error('http ' + res.status);
+    const blob = await res.blob();
+    const head = new Uint8Array(await blob.slice(0, 4).arrayBuffer());
+    if (String.fromCharCode(...head) !== 'glTF') throw new Error('not glb');
+    input.value = '';
+    await importUserModel('IKEA ' + parsed.item, blob);
+  } catch {
+    ctx.statusEl.textContent = t('status.ikeaFail');
+  }
 }
 
 // ---------- scan clones ----------

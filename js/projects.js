@@ -4,10 +4,12 @@
 import { t } from './i18n.js';
 
 const DB_NAME = 'planstudio';
-const STORE = 'models';
+const STORE = 'models';           // house scans (projects)
+const FURN_STORE = 'furnitureModels';  // user-imported furniture GLBs (incl. IKEA)
 const NAMES_KEY = 'ps:names';
 const BUILTIN = [
   { file: '8_31_2026.glb', labelKey: 'menu.sample' },
+  { file: 'nisantasi-1p1.glb', label: 'Nişantaşı 1+1' },
 ];
 
 let ctx = null;
@@ -105,7 +107,7 @@ async function render() {
   for (const b of BUILTIN) {
     gridEl.appendChild(card({
       modelName: b.file,
-      label: displayName(b.file, t(b.labelKey)),
+      label: displayName(b.file, b.labelKey ? t(b.labelKey) : b.label),
       onOpen: () => { ctx.loadModel(b.file, b.file, false); hideMenu(); },
     }));
   }
@@ -203,12 +205,50 @@ function readMeta(modelName) {
 // ---------- IndexedDB ----------
 function openDB() {
   return new Promise((res, rej) => {
-    const req = indexedDB.open(DB_NAME, 1);
+    const req = indexedDB.open(DB_NAME, 2);
     req.onupgradeneeded = () => {
-      req.result.createObjectStore(STORE, { keyPath: 'name' });
+      const db = req.result;
+      if (!db.objectStoreNames.contains(STORE)) db.createObjectStore(STORE, { keyPath: 'name' });
+      if (!db.objectStoreNames.contains(FURN_STORE)) db.createObjectStore(FURN_STORE, { keyPath: 'name' });
     };
     req.onsuccess = () => res(req.result);
     req.onerror = () => rej(req.error);
+  });
+}
+
+// ---------- user furniture model store (used by catalog.js) ----------
+export async function putFurnitureModel(rec) {
+  const db = await openDB();
+  return new Promise((res, rej) => {
+    const tx = db.transaction(FURN_STORE, 'readwrite');
+    tx.objectStore(FURN_STORE).put(rec);
+    tx.oncomplete = res;
+    tx.onerror = () => rej(tx.error);
+  });
+}
+export async function listFurnitureModels() {
+  const db = await openDB();
+  return new Promise((res, rej) => {
+    const req = db.transaction(FURN_STORE).objectStore(FURN_STORE).getAll();
+    req.onsuccess = () => res(req.result || []);
+    req.onerror = () => rej(req.error);
+  });
+}
+export async function getFurnitureModel(name) {
+  const db = await openDB();
+  return new Promise((res, rej) => {
+    const req = db.transaction(FURN_STORE).objectStore(FURN_STORE).get(name);
+    req.onsuccess = () => res(req.result || null);
+    req.onerror = () => rej(req.error);
+  });
+}
+export async function deleteFurnitureModel(name) {
+  const db = await openDB();
+  return new Promise((res, rej) => {
+    const tx = db.transaction(FURN_STORE, 'readwrite');
+    tx.objectStore(FURN_STORE).delete(name);
+    tx.oncomplete = res;
+    tx.onerror = () => rej(tx.error);
   });
 }
 async function idbPut(rec) {

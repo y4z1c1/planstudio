@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { GLTFExporter } from 'three/addons/exporters/GLTFExporter.js';
 import * as persist from './persist.js';
 import { t } from './i18n.js';
 
@@ -534,6 +535,7 @@ function showCtxMenu(x, y, obj) {
   };
   item('i-rotate', t('ctx.rotate'), () => rotateSelected());
   item('i-copy', t('ctx.duplicate'), () => duplicate(obj));
+  item('i-folder', t('ctx.toCatalog'), () => exportToCatalog(obj));
   item('i-trash', t('ctx.delete'), () => remove(obj), 'danger');
   ctxMenuEl.style.display = 'block';
   const r = ctxMenuEl.getBoundingClientRect();
@@ -543,6 +545,36 @@ function showCtxMenu(x, y, obj) {
 
 function hideCtxMenu() {
   if (ctxMenuEl) ctxMenuEl.style.display = 'none';
+}
+
+// ---------- cross-project copy ----------
+// Export the object as a standalone GLB into the shared furniture store
+// (IndexedDB is per-browser, not per-project) so it can be placed in any
+// other project from the "Imported furniture" catalog section.
+function exportToCatalog(obj) {
+  const clone = obj.clone(true);
+  clone.position.set(0, 0, 0);
+  clone.rotation.set(0, 0, 0);
+  // strip CSS2D labels — the exporter can't serialize them
+  const drop = [];
+  clone.traverse(o => { if (o.isCSS2DObject) drop.push(o); });
+  drop.forEach(o => o.parent.remove(o));
+  // materials may carry clipping planes from the house model; export clean copies
+  clone.traverse(o => {
+    if (o.isMesh && o.material?.clippingPlanes?.length) {
+      o.material = o.material.clone();
+      o.material.clippingPlanes = null;
+    }
+  });
+  new THREE.Box3().setFromObject(clone).getSize(hoverSize);
+  const name = `${labelOf(obj)} ${Math.round(hoverSize.x * 100)}×${Math.round(hoverSize.z * 100)}`;
+  new GLTFExporter().parse(clone,
+    result => {
+      const blob = new Blob([result], { type: 'model/gltf-binary' });
+      if (ctx.importUserModel) ctx.importUserModel(name, blob, { spawn: false });
+    },
+    () => { ctx.statusEl.textContent = t('status.importFail', { name }); },
+    { binary: true });
 }
 
 // ---------- selection ----------
