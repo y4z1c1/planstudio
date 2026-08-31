@@ -1,0 +1,260 @@
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { CSS2DRenderer } from 'three/addons/renderers/CSS2DRenderer.js';
+import { ctx } from './ctx.js';
+import * as results from './results.js';
+import * as measure from './measure.js';
+import * as editor from './editor.js';
+import * as catalog from './catalog.js';
+import * as semantic from './semantic.js';
+import * as persist from './persist.js';
+import * as doors from './doors.js';
+import * as walk from './walk.js';
+import * as env from './env.js';
+import * as projects from './projects.js';
+
+// ---------- scene bootstrap ----------
+const wrap = document.getElementById('canvas-wrap');
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x16181d);
+
+const camera = new THREE.PerspectiveCamera(60, innerWidth / innerHeight, 0.01, 500);
+camera.position.set(4, 5, 4);
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(innerWidth, innerHeight);
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.localClippingEnabled = true;
+wrap.appendChild(renderer.domElement);
+
+const labelRenderer = new CSS2DRenderer();
+labelRenderer.setSize(innerWidth, innerHeight);
+labelRenderer.domElement.style.position = 'absolute';
+labelRenderer.domElement.style.top = '0';
+labelRenderer.domElement.style.pointerEvents = 'none';
+wrap.appendChild(labelRenderer.domElement);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.dampingFactor = 0.08;
+
+scene.add(new THREE.AmbientLight(0xffffff, 1.2));
+const dir = new THREE.DirectionalLight(0xffffff, 1.5);
+dir.position.set(5, 10, 5);
+scene.add(dir);
+const dir2 = new THREE.DirectionalLight(0xffffff, 0.6);
+dir2.position.set(-5, 8, -5);
+scene.add(dir2);
+
+const grid = new THREE.GridHelper(20, 40, 0x333845, 0x24272e);
+scene.add(grid);
+
+const clipPlane = new THREE.Plane(new THREE.Vector3(0, -1, 0), 1e6);
+
+// ---------- ctx wiring ----------
+Object.assign(ctx, {
+  scene, camera, renderer, labelRenderer, controls, grid, clipPlane,
+  modelBox: new THREE.Box3(),
+  raycaster: new THREE.Raycaster(),
+  mouseNDC: new THREE.Vector2(),
+  statusEl: document.getElementById('status'),
+});
+
+ctx.setNDC = ev => {
+  const r = renderer.domElement.getBoundingClientRect();
+  ctx.mouseNDC.x = ((ev.clientX - r.left) / r.width) * 2 - 1;
+  ctx.mouseNDC.y = -((ev.clientY - r.top) / r.height) * 2 + 1;
+  ctx.raycaster.setFromCamera(ctx.mouseNDC, camera);
+};
+
+ctx.pickPoint = ev => {
+  if (!ctx.model) return null;
+  ctx.setNDC(ev);
+  const hits = ctx.raycaster.intersectObject(ctx.model, true);
+  for (const h of hits) {
+    if (!h.object.visible) continue;
+    if (h.point.y <= clipPlane.constant) return h.point.clone();
+  }
+  return null;
+};
+
+ctx.worldToScreenDist = (a, b) => {
+  const pa = a.clone().project(camera), pb = b.clone().project(camera);
+  return Math.hypot((pa.x - pb.x) * innerWidth / 2, (pa.y - pb.y) * innerHeight / 2);
+};
+
+ctx.fitCameraToModel = obj => {
+  const box = new THREE.Box3().setFromObject(obj);
+  const size = box.getSize(new THREE.Vector3());
+  const center = box.getCenter(new THREE.Vector3());
+  const maxDim = Math.max(size.x, size.y, size.z);
+  controls.target.copy(center);
+  camera.position.set(center.x + maxDim * 0.8, center.y + maxDim * 0.9, center.z + maxDim * 0.8);
+  camera.near = maxDim / 100;
+  camera.far = maxDim * 20;
+  camera.updateProjectionMatrix();
+  grid.position.y = box.min.y - 0.01;
+  controls.update();
+};
+
+// ---------- mode system ----------
+ctx.setMode = m => {
+  measure.cancelCurrent();
+  editor.deselect();
+  ctx.mode = (ctx.mode === m) ? null : m;
+  for (const ui of ctx.modeUI) {
+    const on = ctx.mode === ui.mode;
+    ui.button.classList.toggle('active', on);
+    ui.hints.forEach(el => el.classList.toggle('show', on));
+  }
+  renderer.domElement.style.cursor =
+    (ctx.mode === 'area' || ctx.mode === 'dist' || ctx.mode === 'door') ? 'crosshair' : 'default';
+};
+
+// buttons steal focus → Enter/R keys would re-trigger them; always blur after click
+document.querySelectorAll('button').forEach(b =>
+  b.addEventListener('click', () => b.blur())
+);
+
+// ---------- central event dispatch ----------
+let downPos = null;
+renderer.domElement.addEventListener('pointerdown', ev => {
+  downPos = [ev.clientX, ev.clientY];
+  for (const h of ctx.pointerHooks.down) if (h(ev)) return;
+});
+renderer.domElement.addEventListener('pointermove', ev => {
+  for (const h of ctx.pointerHooks.move) if (h(ev)) return;
+});
+renderer.domElement.addEventListener('pointerup', ev => {
+  ev._isClick = downPos && Math.hypot(ev.clientX - downPos[0], ev.clientY - downPos[1]) <= 5;
+  downPos = null;
+  for (const h of ctx.pointerHooks.up) if (h(ev)) return;
+});
+renderer.domElement.addEventListener('dblclick', ev => {
+  for (const h of ctx.dblHooks) if (h(ev)) return;
+});
+addEventListener('keydown', ev => {
+  if (ev.target.tagName === 'INPUT') return;
+  if ((ev.metaKey || ev.ctrlKey) && (ev.key === 'z' || ev.key === 'Z')) {
+    ev.preventDefault();
+    if (persist.undo()) location.reload();
+    return;
+  }
+  for (const h of ctx.keyHooks) if (h(ev)) return;
+});
+
+// ---------- module init (hook order = dispatch priority: editor before measure) ----------
+results.init(ctx);
+editor.init(ctx);
+measure.init(ctx);
+catalog.init(ctx);
+doors.init(ctx);
+semantic.init(ctx);
+walk.init(ctx);
+env.init(ctx);
+projects.init(ctx);
+
+// ---------- model loading ----------
+const loader = new GLTFLoader();
+const modelNameEl = document.getElementById('model-name');
+
+ctx.loadModel = (url, name, revoke = false) => {
+  loader.load(url,
+    g => { setModel(g.scene, name); if (revoke) URL.revokeObjectURL(url); },
+    undefined,
+    () => { ctx.statusEl.textContent = 'Model yüklenemedi: ' + name; });
+};
+
+function setModel(gltfScene, name) {
+  if (ctx.model) scene.remove(ctx.model);
+  ctx.model = gltfScene;
+  ctx.modelName = name;
+  persist.loadFor(name);
+  persist.ensureBaseline();
+  ctx.model.traverse(o => {
+    if (o.isMesh) {
+      o.material.side = THREE.DoubleSide;
+      o.material.clippingPlanes = [clipPlane];
+      o.material.clipShadows = true;
+    }
+  });
+  scene.add(ctx.model);
+  ctx.modelBox.setFromObject(ctx.model);
+  ctx.fitCameraToModel(ctx.model);
+  const s = ctx.modelBox.getSize(new THREE.Vector3());
+  modelNameEl.textContent = `${name} — ${s.x.toFixed(1)} × ${s.z.toFixed(1)} × ${s.y.toFixed(1)} m`;
+  for (const h of ctx.modelHooks) h(ctx.model, name);
+  ceilingHidden = false;
+  applyCeiling();
+}
+
+// drag & drop (house model) — saved into the project store, then opened
+const dropOverlay = document.getElementById('drop-overlay');
+addEventListener('dragover', e => { e.preventDefault(); dropOverlay.classList.add('show'); });
+addEventListener('dragleave', e => { if (!e.relatedTarget) dropOverlay.classList.remove('show'); });
+addEventListener('drop', e => {
+  e.preventDefault();
+  dropOverlay.classList.remove('show');
+  const f = e.dataTransfer.files[0];
+  if (!f || !f.name.toLowerCase().endsWith('.glb')) return;
+  projects.importFile(f);
+});
+
+// ---------- ceiling toggle ----------
+// semantic models: hide the Ceilings group outright; other GLBs: clip the top
+let ceilingHidden = false;
+const btnCeiling = document.getElementById('btn-ceiling');
+function applyCeiling() {
+  btnCeiling.classList.toggle('active', ceilingHidden);
+  btnCeiling.querySelector('.lbl').textContent =
+    ceilingHidden ? 'Tavanı Göster' : 'Tavanı Gizle';
+  const ceilings = semantic.semantic?.ceilingsGroup;
+  if (ceilings) {
+    ceilings.visible = !ceilingHidden;
+    clipPlane.constant = 1e6;
+    return;
+  }
+  const box = ctx.modelBox;
+  clipPlane.constant = ceilingHidden
+    ? box.min.y + (box.max.y - box.min.y) * 0.55
+    : 1e6;
+}
+btnCeiling.onclick = () => { ceilingHidden = !ceilingHidden; applyCeiling(); };
+
+// ---------- camera views ----------
+document.getElementById('btn-top').onclick = () => {
+  if (!ctx.model) return;
+  const c = ctx.modelBox.getCenter(new THREE.Vector3());
+  const size = ctx.modelBox.getSize(new THREE.Vector3());
+  const h = Math.max(size.x, size.z) * 1.3;
+  camera.position.set(c.x, ctx.modelBox.max.y + h, c.z + 0.001);
+  controls.target.copy(c);
+  controls.update();
+};
+document.getElementById('btn-persp').onclick = () => {
+  if (ctx.model) ctx.fitCameraToModel(ctx.model);
+};
+
+// ---------- loop ----------
+addEventListener('resize', () => {
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+  labelRenderer.setSize(innerWidth, innerHeight);
+});
+
+window.__ctx = ctx;   // console debugging convenience
+
+let lastT = performance.now();
+function animate() {
+  requestAnimationFrame(animate);
+  const now = performance.now();
+  const dt = Math.min((now - lastT) / 1000, 0.1);
+  lastT = now;
+  for (const h of ctx.tickHooks) h(dt);
+  if (!walk.active) controls.update();   // OrbitControls would override the walk camera
+  renderer.render(scene, camera);
+  labelRenderer.render(scene, camera);
+}
+animate();
