@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
 import * as persist from './persist.js';
 import * as editor from './editor.js';
 import { t } from './i18n.js';
@@ -14,7 +15,8 @@ let sunTarget = null;
 let savedLights = null;
 let savedCeiling = false;
 let btn = null, panel = null;
-let dateInput, timeInput, northInput, infoEl, timeLabel;
+let dateInput, timeInput, northInput, infoEl, timeLabel, clockInput;
+let northArrow = null;
 
 const TZ = 3;   // Türkiye (UTC+3, no DST)
 const LOCATIONS = {
@@ -31,19 +33,28 @@ export function init(c) {
   northInput = document.getElementById('sun-north');
   infoEl = document.getElementById('sun-info');
   timeLabel = document.getElementById('sun-time-label');
+  clockInput = document.getElementById('sun-clock');
 
   dateInput.value = new Date().toISOString().slice(0, 10);
   timeInput.value = '13';
 
   btn.onclick = () => (active ? disable() : enable());
   dateInput.addEventListener('input', update);
-  timeInput.addEventListener('input', update);
+  timeInput.addEventListener('input', () => {
+    const h = +timeInput.value;
+    clockInput.value = fmtH(h);
+    update();
+  });
+  clockInput.addEventListener('input', () => {
+    const [hh, mm] = clockInput.value.split(':').map(Number);
+    if (!isNaN(hh)) { timeInput.value = hh + (mm || 0) / 60; update(); }
+  });
   northInput.addEventListener('input', () => {
     persist.get().sun = { north: +northInput.value };
     persist.save();
     update();
   });
-  [dateInput, timeInput, northInput].forEach(el =>
+  [dateInput, timeInput, northInput, clockInput].forEach(el =>
     el.addEventListener('keydown', ev => ev.stopPropagation()));
 
   ctx.cleanupHooks.push(() => { if (active) disable(); });
@@ -91,6 +102,29 @@ function enable() {
   cam.updateProjectionMatrix();
   sunLight.visible = true;
 
+  if (!northArrow) {
+    // red floor arrow pointing to true north, with an N tag
+    const g = new THREE.Group();
+    const mat = new THREE.MeshBasicMaterial({ color: 0xe05252, depthTest: false });
+    const shaft = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.02, 1.6), mat);
+    shaft.position.z = 0.8;
+    const head = new THREE.Mesh(new THREE.ConeGeometry(0.22, 0.5, 4), mat);
+    head.rotation.x = Math.PI / 2;
+    head.rotation.y = Math.PI / 4;
+    head.position.z = 1.85;
+    g.add(shaft, head);
+    const tag = document.createElement('div');
+    tag.className = 'marker-label';
+    tag.textContent = 'N';
+    tag.style.color = '#e05252';
+    const lbl = new CSS2DObject(tag);
+    lbl.position.set(0, 0.25, 2.15);
+    g.add(lbl);
+    g.traverse(o => { if (o.isMesh) o.renderOrder = 998; });
+    northArrow = g;
+    ctx.scene.add(g);
+  }
+  northArrow.visible = true;
   markShadows();
   update();
 }
@@ -100,6 +134,7 @@ function disable() {
   btn.classList.remove('active');
   panel.classList.remove('show');
   if (sunLight) sunLight.visible = false;
+  if (northArrow) northArrow.visible = false;
   if (savedLights) {
     ctx.lights.ambient.intensity = savedLights.ambient;
     ctx.lights.dir.intensity = savedLights.dir;
@@ -171,6 +206,11 @@ function update() {
   const box = ctx.modelBox;
   const c = box.getCenter(new THREE.Vector3());
   sunTarget.position.copy(c);
+  if (northArrow) {
+    // arrow sits just outside the model, rotated to true north
+    northArrow.position.set(c.x, box.min.y + 0.03, box.max.z + 0.8);
+    northArrow.rotation.y = north;
+  }
 
   const elDeg = s.el * 180 / Math.PI;
   if (elDeg <= 0) {
