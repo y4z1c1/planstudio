@@ -387,7 +387,12 @@ async function fetchIkea() {
     input.value = '';
     await importUserModel('IKEA ' + parsed.item, blob);
   } catch {
-    ctx.statusEl.textContent = t('status.ikeaFail');
+    // the rotera CDN blocks datacenter IPs, so the proxy can fail; a plain
+    // navigation from the user's own IP carries no Origin header and works —
+    // download in a new tab, then import the file manually
+    const cc = parsed.cc || 'tr', lc = parsed.lc || 'tr';
+    window.open(`https://web-api.ikea.com/${cc}/${lc}/rotera/static/models/${parsed.item}-mini.glb`, '_blank');
+    ctx.statusEl.textContent = t('status.ikeaManual');
   }
 }
 
