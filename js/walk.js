@@ -2,6 +2,8 @@ import * as THREE from 'three';
 import * as semantic from './semantic.js';
 import * as doorsMod from './doors.js';
 import * as editor from './editor.js';
+import * as measure from './measure.js';
+import { t } from './i18n.js';
 
 // Game-style first-person mode: pointer-lock mouse look (Minecraft POV),
 // WASD/arrows + collision against walls, doors AND objects, crosshair,
@@ -25,6 +27,7 @@ let crosshair = null, prompt = null;
 let aimedDoor = null;
 let bobT = 0;
 let feetY = 0, velY = 0, grounded = true;
+let savedCeiling = false;
 const rayc = new THREE.Raycaster();
 const DOWN = new THREE.Vector3(0, -1, 0);
 
@@ -55,10 +58,19 @@ export function init(c) {
 
   ctx.pointerHooks.down.unshift(ev => {
     if (!active) return false;
-    if (locked) { interact(); return true; }        // click = use door
+    const measuring = ctx.mode === 'area' || ctx.mode === 'dist';
+    if (locked) {
+      // crosshair click: measuring uses the screen center, otherwise use doors
+      if (measuring) {
+        measure.clickAt({ clientX: innerWidth / 2, clientY: innerHeight / 2 });
+      } else {
+        interact();
+      }
+      return true;
+    }
     // not locked yet: clicking the canvas requests the lock (drag-look fallback)
     requestLock();
-    if (aimedDoor) interact();                      // clicking a door works unlocked too
+    if (!measuring && aimedDoor) interact();
     looking = true;
     lastX = ev.clientX; lastY = ev.clientY;
     return true;
@@ -74,8 +86,12 @@ export function init(c) {
     }
     return true;
   });
-  ctx.pointerHooks.up.unshift(() => {
+  ctx.pointerHooks.up.unshift(ev => {
     if (!active) return false;
+    // unlocked fallback: a clean click while measuring drops a point at the cursor
+    if (!locked && ev._isClick && (ctx.mode === 'area' || ctx.mode === 'dist')) {
+      measure.clickAt(ev);
+    }
     looking = false;
     return true;
   });
@@ -151,15 +167,19 @@ function enter() {
   ctx.camera.position.set(sx, feetY + EYE, sz);
   ctx.controls.enabled = false;
   active = true;
+  ctx.walkActive = true;
+  savedCeiling = ctx.getCeiling ? ctx.getCeiling() : false;
+  if (ctx.setCeiling) ctx.setCeiling(false);     // ceiling back on while inside
   applyLook();
   btn.classList.add('active');
   crosshair.style.display = 'block';
-  ctx.statusEl.textContent = 'WASD/ok = yürü · fare = bak · Space = zıpla · E / tık = kapı · Shift = koş · Esc = çık';
+  ctx.statusEl.textContent = t('status.walk');
   requestLock();
 }
 
 function exit() {
   active = false;
+  ctx.walkActive = false;
   keys.clear();
   looking = false;
   aimedDoor = null;
@@ -170,10 +190,11 @@ function exit() {
     ctx.camera.position.copy(saved.pos);
     ctx.controls.target.copy(saved.target);
   }
+  if (ctx.setCeiling) ctx.setCeiling(savedCeiling);   // restore the plan view cut
   ctx.controls.enabled = true;
   ctx.controls.update();
   btn.classList.remove('active');
-  ctx.statusEl.textContent = 'Dolaşma modundan çıkıldı';
+  ctx.statusEl.textContent = t('status.walkExit');
 }
 
 function applyLook() {
@@ -296,8 +317,8 @@ function tick(dt) {
       aimedDoor = o;
     }
   }
-  if (aimedDoor) {
-    prompt.textContent = aimedDoor.userData.open ? 'E — kapıyı kapat' : 'E — kapıyı aç';
+  if (aimedDoor && ctx.mode !== 'area' && ctx.mode !== 'dist') {
+    prompt.textContent = t(aimedDoor.userData.open ? 'walk.doorClose' : 'walk.doorOpen');
     prompt.style.display = 'block';
   } else {
     prompt.style.display = 'none';

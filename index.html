@@ -56,25 +56,42 @@
     padding: 5px 10px; font-size: 12px; font-weight: 600;
   }
   #total-chip .v { color: var(--green); }
+  #lang-sw { display: flex; border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+  #lang-sw button {
+    background: transparent; border: none; color: var(--muted); font-family: inherit;
+    font-size: 11px; font-weight: 600; padding: 5px 8px; cursor: pointer;
+  }
+  #lang-sw button.on { background: var(--panel2); color: var(--text); }
 
-  /* ---------- left toolbar ---------- */
+  /* ---------- left toolbar (accordion) ---------- */
   #toolbar {
     position: absolute; top: 56px; left: 12px; z-index: 10;
-    display: flex; flex-direction: column; gap: 2px;
+    display: flex; flex-direction: column; gap: 4px;
     background: var(--panel); border: 1px solid var(--border);
-    border-radius: 8px; padding: 8px; width: 216px;
+    border-radius: 8px; padding: 6px; width: 224px;
     max-height: calc(100% - 68px); overflow-y: auto;
   }
-  .section-title {
-    font-size: 10px; font-weight: 600; color: var(--muted);
-    text-transform: uppercase; letter-spacing: .8px;
-    padding: 8px 8px 4px;
+  .grp { border-radius: var(--radius); }
+  .grp-head {
+    display: flex; align-items: center; gap: 9px; width: 100%;
+    background: transparent; border: none; color: var(--text);
+    font-family: inherit; font-size: 12.5px; font-weight: 600;
+    padding: 8px 9px; cursor: pointer; border-radius: var(--radius);
   }
+  .grp-head:hover { background: var(--panel2); }
+  .grp-head .lbl { flex: 1; text-align: left; }
+  .grp-head .chev { transition: transform .15s; width: 13px; height: 13px; stroke: var(--muted); }
+  .grp.open .grp-head .chev { transform: rotate(90deg); }
+  .grp.open .grp-head { color: #fff; }
+  .grp.open .grp-head svg.g-ico { stroke: var(--accent); }
+  .grp-body { display: none; flex-direction: column; gap: 2px; padding: 0 0 4px 6px; }
+  .grp.open .grp-body { display: flex; }
+
   .btn {
     display: flex; align-items: center; gap: 9px;
     background: transparent; color: var(--text);
     border: 1px solid transparent; border-radius: var(--radius);
-    padding: 7px 9px; font-size: 12.5px; font-weight: 500; cursor: pointer;
+    padding: 6px 9px; font-size: 12.5px; font-weight: 500; cursor: pointer;
     font-family: inherit; text-align: left; width: 100%;
     transition: background .12s, border-color .12s;
   }
@@ -82,10 +99,10 @@
   .btn.active { background: rgba(61,126,255,.12); border-color: var(--accent-dim); color: #fff; }
   .btn.active svg.ico { stroke: var(--accent); }
   .btn .lbl { flex: 1; }
-  .btn kbd {
+  .btn kbd, .grp-head kbd {
     font-family: inherit; font-size: 10px; color: var(--muted);
     background: var(--panel2); border: 1px solid var(--border);
-    border-radius: 4px; padding: 1px 5px;
+    border-radius: 4px; padding: 1px 5px; font-weight: 500;
   }
   .btn-row { display: flex; gap: 4px; }
   .btn-row .btn { justify-content: center; }
@@ -98,9 +115,14 @@
   .hint.show { display: block; }
   .hint b { color: var(--text); font-weight: 600; }
 
-  /* ---------- furniture list ---------- */
-  #furn-list { display: none; flex-direction: column; gap: 2px; margin-top: 2px; }
-  #furn-list.show { display: flex; }
+  /* ---------- add panel ---------- */
+  #furn-search {
+    width: 100%; background: var(--panel2); border: 1px solid var(--border);
+    border-radius: var(--radius); color: var(--text); font-family: inherit;
+    font-size: 12px; padding: 6px 9px; outline: none; margin: 2px 0 4px;
+  }
+  #furn-search:focus { border-color: var(--accent-dim); }
+  #furn-list { display: flex; flex-direction: column; gap: 2px; }
   .furn-section {
     font-size: 10px; font-weight: 600; color: var(--muted);
     text-transform: uppercase; letter-spacing: .8px; padding: 8px 8px 3px;
@@ -111,6 +133,7 @@
     border: 1px solid transparent;
   }
   .furn-item:hover { background: var(--panel2); border-color: var(--border); }
+  .furn-item.active { background: rgba(61,126,255,.12); border-color: var(--accent-dim); }
   .furn-item .dims { color: var(--muted); font-size: 10.5px; white-space: nowrap; }
 
   /* ---------- results panel ---------- */
@@ -151,13 +174,32 @@
   #total-row .v { color: var(--green); font-size: 14px; font-variant-numeric: tabular-nums; }
 
   /* ---------- overlays ---------- */
-  #live-label {
+  #live-label, #hover-dims {
     position: absolute; z-index: 20; pointer-events: none;
     background: rgba(19,21,25,.92); border: 1px solid var(--border);
     border-radius: var(--radius); padding: 4px 8px; font-size: 12px; font-weight: 600;
     color: var(--amber); display: none; white-space: nowrap;
     transform: translate(12px, -24px); font-variant-numeric: tabular-nums;
   }
+  #hover-dims { color: var(--text); transform: translate(14px, 10px); }
+  #hover-dims .t { color: var(--muted); font-weight: 500; margin-right: 6px; }
+  #ctx-menu {
+    position: absolute; z-index: 40; display: none; min-width: 160px;
+    background: var(--panel); border: 1px solid var(--border); border-radius: 8px;
+    padding: 4px; box-shadow: 0 10px 30px rgba(0,0,0,.5);
+  }
+  #ctx-menu .cm-title {
+    font-size: 11px; font-weight: 600; color: var(--muted);
+    padding: 6px 9px 4px; border-bottom: 1px solid var(--border); margin-bottom: 3px;
+  }
+  #ctx-menu .cm-item {
+    display: flex; align-items: center; gap: 8px; width: 100%;
+    background: none; border: none; color: var(--text); font-family: inherit;
+    font-size: 12.5px; padding: 6px 9px; cursor: pointer; border-radius: var(--radius);
+    text-align: left;
+  }
+  #ctx-menu .cm-item:hover { background: var(--panel2); }
+  #ctx-menu .cm-item.danger { color: var(--red); }
   #drop-overlay {
     position: absolute; inset: 0; z-index: 70; display: none;
     align-items: center; justify-content: center;
@@ -201,6 +243,7 @@
   }
   #menu.show { display: block; }
   #menu-inner { max-width: 780px; margin: 0 auto; padding: 60px 24px; }
+  #menu-top { display: flex; align-items: flex-start; justify-content: space-between; }
   #menu-logo { display: flex; align-items: center; gap: 12px; margin-bottom: 6px; }
   #menu-logo svg { width: 30px; height: 30px; stroke: var(--accent); stroke-width: 1.8; fill: none; }
   #menu-logo h1 { font-size: 26px; font-weight: 700; letter-spacing: -0.5px; }
@@ -216,16 +259,23 @@
     transition: border-color .12s, background .12s;
   }
   .proj-card:hover { border-color: var(--accent-dim); background: var(--panel2); }
-  .proj-card .p-name { font-weight: 600; font-size: 14px; margin-bottom: 4px; padding-right: 20px;
+  .proj-card .p-name { font-weight: 600; font-size: 14px; margin-bottom: 4px; padding-right: 44px;
     overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .proj-card .p-name input {
+    background: var(--panel2); border: 1px solid var(--accent-dim); border-radius: 4px;
+    color: var(--text); font-family: inherit; font-size: 13px; font-weight: 600;
+    padding: 2px 6px; width: 100%; outline: none;
+  }
   .proj-card .p-meta { color: var(--muted); font-size: 11.5px; line-height: 1.6; }
   .proj-card .p-meta .m2 { color: var(--green); font-weight: 600; }
-  .proj-card .p-del {
-    position: absolute; top: 10px; right: 10px; background: none; border: none;
-    color: var(--muted); cursor: pointer; padding: 2px; display: none; font-family: inherit;
+  .proj-card .p-actions { position: absolute; top: 10px; right: 10px; display: none; gap: 2px; }
+  .proj-card:hover .p-actions { display: flex; }
+  .p-actions button {
+    background: none; border: none; color: var(--muted); cursor: pointer; padding: 3px;
+    font-family: inherit; border-radius: 4px;
   }
-  .proj-card:hover .p-del { display: block; }
-  .proj-card .p-del:hover { color: var(--red); }
+  .p-actions button:hover { color: var(--text); background: var(--panel3); }
+  .p-actions button.p-del:hover { color: var(--red); }
   .proj-card.new {
     border-style: dashed; display: flex; flex-direction: column;
     align-items: center; justify-content: center; gap: 8px; min-height: 96px;
@@ -257,95 +307,108 @@
   <symbol id="i-undo" viewBox="0 0 24 24"><path d="M4.5 10H14a5 5 0 010 10h-4M8.5 6l-4 4 4 4"/></symbol>
   <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
   <symbol id="i-x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></symbol>
-  <symbol id="i-home" viewBox="0 0 24 24"><path d="M3.5 10.5L12 3l8.5 7.5M5.5 9.5V20a1 1 0 001 1h11a1 1 0 001-1V9.5M9.5 21v-6h5v6"/></symbol>
-  <symbol id="i-folder" viewBox="0 0 24 24"><path d="M3 7a1 1 0 011-1h5l2 2h9a1 1 0 011 1v9a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></symbol>
+  <symbol id="i-chev" viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/></symbol>
+  <symbol id="i-rotate" viewBox="0 0 24 24"><path d="M20 11a8 8 0 10.5 4M20 4v7h-7"/></symbol>
+  <symbol id="i-copy" viewBox="0 0 24 24"><path d="M9 9h11v11H9zM5 15H4a1 1 0 01-1-1V4a1 1 0 011-1h10a1 1 0 011 1v1"/></symbol>
+  <symbol id="i-pencil" viewBox="0 0 24 24"><path d="M17 3.5l3.5 3.5L8 19.5H4.5V16zM13.5 7l3.5 3.5"/></symbol>
 </svg>
 
 <div id="canvas-wrap"></div>
 
 <div id="topbar">
-  <div id="brand" title="Ana menü"><svg class="ico"><use href="#i-logo"/></svg><span>PlanStudio</span></div>
+  <div id="brand" title="PlanStudio"><svg class="ico"><use href="#i-logo"/></svg><span>PlanStudio</span></div>
   <div class="sep"></div>
-  <div id="model-name">proje seçilmedi</div>
+  <div id="model-name" data-i18n="top.noProject">proje seçilmedi</div>
   <div id="topbar-right">
-    <div id="total-chip"><span>Net alan</span><span class="v" id="total-chip-val">–</span></div>
+    <div id="total-chip"><span data-i18n="top.netArea">Net alan</span><span class="v" id="total-chip-val">–</span></div>
+    <div id="lang-sw">
+      <button id="lang-tr">TR</button><button id="lang-en">EN</button>
+    </div>
   </div>
 </div>
 
 <div id="toolbar">
-  <div class="section-title">Ölçüm</div>
-  <button class="btn" id="btn-auto"><svg class="ico"><use href="#i-scan"/></svg><span class="lbl">Otomatik Ölç</span></button>
-  <button class="btn" id="btn-area"><svg class="ico"><use href="#i-area"/></svg><span class="lbl">Alan Ölç</span><kbd>m²</kbd></button>
-  <button class="btn" id="btn-dist"><svg class="ico"><use href="#i-ruler"/></svg><span class="lbl">Mesafe Ölç</span><kbd>m</kbd></button>
 
-  <div class="section-title">Görünüm</div>
-  <div class="btn-row">
-    <button class="btn" id="btn-top"><svg class="ico"><use href="#i-top"/></svg><span class="lbl">Üstten</span></button>
-    <button class="btn" id="btn-persp"><svg class="ico"><use href="#i-cube"/></svg><span class="lbl">Serbest</span></button>
-  </div>
-  <button class="btn" id="btn-ceiling"><svg class="ico"><use href="#i-layers"/></svg><span class="lbl">Tavanı Gizle</span></button>
-  <button class="btn" id="btn-walk"><svg class="ico"><use href="#i-walk"/></svg><span class="lbl">Dolaş</span><kbd>G</kbd></button>
-  <button class="btn" id="btn-env"><svg class="ico"><use href="#i-tree"/></svg><span class="lbl">Dış Ortam</span></button>
-
-  <div class="section-title">Düzenleme</div>
-  <button class="btn" id="btn-edit"><svg class="ico"><use href="#i-edit"/></svg><span class="lbl">Modeli Düzenle</span></button>
-  <div class="hint" id="hint-edit">
-    <b>Düzenleme modu:</b> Eşyaya tıkla &amp; sürükle = taşı. Seçiliyken <b>R</b> = döndür, <b>D</b> = kopyala, <b>Delete</b> = sil (gizler, geri alınabilir).
-    <button class="btn" id="btn-reset-edits" style="margin-top:6px;font-size:11px;padding:5px 8px;"><svg class="ico"><use href="#i-undo"/></svg><span class="lbl">Düzenlemeleri sıfırla</span></button>
-  </div>
-  <button class="btn" id="btn-door"><svg class="ico"><use href="#i-door"/></svg><span class="lbl">Kapı Ekle</span></button>
-  <div class="hint" id="hint-door">
-    <b>Kapı modu:</b> Bir duvara tıkla, oraya kapı yerleşir. Taşımak/silmek için Düzenle moduna geç.
-  </div>
-  <button class="btn" id="btn-history"><svg class="ico"><use href="#i-history"/></svg><span class="lbl">Geçmiş / Geri Al</span></button>
-  <div class="hint" id="history-panel">
-    <b>Ctrl/⌘+Z</b> = son değişikliği geri al. Eski bir sürüme dönmek için listeden seç:
-    <div id="history-list"></div>
+  <div class="grp open" id="grp-measure">
+    <button class="grp-head"><svg class="ico g-ico"><use href="#i-scan"/></svg><span class="lbl" data-i18n="grp.measure">Ölçüm</span><svg class="ico chev"><use href="#i-chev"/></svg></button>
+    <div class="grp-body">
+      <button class="btn" id="btn-auto"><svg class="ico"><use href="#i-scan"/></svg><span class="lbl" data-i18n="btn.auto">Otomatik Ölç</span><kbd>1</kbd></button>
+      <button class="btn" id="btn-area"><svg class="ico"><use href="#i-area"/></svg><span class="lbl" data-i18n="btn.area">Alan Ölç</span><kbd>2</kbd></button>
+      <button class="btn" id="btn-dist"><svg class="ico"><use href="#i-ruler"/></svg><span class="lbl" data-i18n="btn.dist">Mesafe Ölç</span><kbd>3</kbd></button>
+      <button class="btn" id="btn-clear"><svg class="ico"><use href="#i-trash"/></svg><span class="lbl" data-i18n="btn.clear">Ölçümleri Temizle</span></button>
+      <div class="hint" id="hint-area" data-i18n="hint.area"></div>
+      <div class="hint" id="hint-dist" data-i18n="hint.dist"></div>
+    </div>
   </div>
 
-  <div class="section-title">Mobilya</div>
-  <button class="btn" id="btn-furn"><svg class="ico"><use href="#i-sofa"/></svg><span class="lbl">Mobilya Ekle</span></button>
-  <div id="furn-list"></div>
-  <div class="hint" id="hint-furn">
-    Tıkla &amp; sürükle = taşı. Seçiliyken <b>R</b> = döndür, <b>D</b> = kopyala, <b>Delete</b> = sil. Çakışan blok mobilya <b style="color:var(--red)">kırmızı</b> yanar.
+  <div class="grp" id="grp-view">
+    <button class="grp-head"><svg class="ico g-ico"><use href="#i-cube"/></svg><span class="lbl" data-i18n="grp.view">Görünüm</span><svg class="ico chev"><use href="#i-chev"/></svg></button>
+    <div class="grp-body">
+      <button class="btn" id="btn-top"><svg class="ico"><use href="#i-top"/></svg><span class="lbl" data-i18n="btn.top">Üstten</span><kbd>4</kbd></button>
+      <button class="btn" id="btn-persp"><svg class="ico"><use href="#i-cube"/></svg><span class="lbl" data-i18n="btn.free">Serbest</span><kbd>5</kbd></button>
+      <button class="btn" id="btn-ceiling"><svg class="ico"><use href="#i-layers"/></svg><span class="lbl">Tavanı Göster</span><kbd>6</kbd></button>
+      <button class="btn" id="btn-env"><svg class="ico"><use href="#i-tree"/></svg><span class="lbl" data-i18n="btn.env">Dış Ortam</span><kbd>7</kbd></button>
+      <button class="btn" id="btn-walk"><svg class="ico"><use href="#i-walk"/></svg><span class="lbl" data-i18n="btn.walk">Dolaş</span><kbd>G</kbd></button>
+    </div>
   </div>
 
-  <button class="btn" id="btn-clear" style="margin-top:6px"><svg class="ico"><use href="#i-trash"/></svg><span class="lbl">Ölçümleri Temizle</span></button>
+  <div class="grp" id="grp-edit">
+    <button class="grp-head"><svg class="ico g-ico"><use href="#i-edit"/></svg><span class="lbl" data-i18n="grp.edit">Düzenleme</span><svg class="ico chev"><use href="#i-chev"/></svg></button>
+    <div class="grp-body">
+      <button class="btn" id="btn-edit"><svg class="ico"><use href="#i-edit"/></svg><span class="lbl" data-i18n="btn.editModel">Modeli Düzenle</span><kbd>E</kbd></button>
+      <div class="hint" id="hint-edit">
+        <span data-i18n="hint.edit"></span>
+        <button class="btn" id="btn-reset-edits" style="margin-top:6px;font-size:11px;padding:5px 8px;"><svg class="ico"><use href="#i-undo"/></svg><span class="lbl" data-i18n="btn.resetEdits">Düzenlemeleri sıfırla</span></button>
+      </div>
+      <button class="btn" id="btn-history"><svg class="ico"><use href="#i-history"/></svg><span class="lbl" data-i18n="btn.history">Geçmiş / Geri Al</span></button>
+      <div class="hint" id="history-panel">
+        <span data-i18n="hint.history"></span>
+        <div id="history-list"></div>
+      </div>
+    </div>
+  </div>
 
-  <div class="hint" id="hint-area">
-    <b>Alan modu:</b> Zemine tıklayarak köşe koy. Kapatmak için <b>ilk noktaya tıkla</b> veya <b>Enter</b>. <b>Esc</b> iptal, <b>Backspace</b> geri al.
+  <div class="grp" id="grp-add">
+    <button class="grp-head"><svg class="ico g-ico"><use href="#i-sofa"/></svg><span class="lbl" data-i18n="grp.add">Ekle</span><kbd>F</kbd><svg class="ico chev"><use href="#i-chev"/></svg></button>
+    <div class="grp-body">
+      <input id="furn-search" type="text" data-i18n-ph="search.placeholder" placeholder="Mobilya ara…">
+      <div id="furn-list"></div>
+      <div class="hint show" id="hint-furn" data-i18n="hint.furn" style="display:block"></div>
+    </div>
   </div>
-  <div class="hint" id="hint-dist">
-    <b>Mesafe modu:</b> İki noktaya tıkla. <b>Esc</b> iptal.
-  </div>
+
 </div>
 
 <div id="results">
-  <h2>Odalar / Alanlar</h2>
-  <div id="room-list"><div class="empty">Henüz ölçüm yok. "Otomatik Ölç" ile başla.</div></div>
+  <h2 data-i18n="results.title">Odalar / Alanlar</h2>
+  <div id="room-list"><div class="empty" data-i18n="results.empty"></div></div>
   <div id="total-row" style="display:none">
-    <span>Toplam</span><span class="v" id="total-val">0.00 m²</span>
+    <span data-i18n="results.total">Toplam</span><span class="v" id="total-val">0.00 m²</span>
   </div>
 </div>
 
 <div id="menu" class="show">
   <div id="menu-inner">
-    <div id="menu-logo"><svg><use href="#i-logo"/></svg><h1>PlanStudio</h1></div>
-    <div id="menu-sub">3D ev planı görüntüleme, m² ölçümü ve mobilya yerleşimi</div>
-    <h2>Projeler</h2>
-    <div id="project-grid"></div>
-    <div id="menu-note">
-      Polycam ile taradığın evi GLB olarak dışa aktar, buraya yükle. Oda alanları otomatik ölçülür;
-      mobilya yerleştirip sığıp sığmadığını test edebilir, evin içinde birinci şahıs modunda dolaşabilirsin.
-      Tüm düzenlemeler tarayıcında saklanır.
+    <div id="menu-top">
+      <div>
+        <div id="menu-logo"><svg><use href="#i-logo"/></svg><h1>PlanStudio</h1></div>
+        <div id="menu-sub" data-i18n="app.subtitle"></div>
+      </div>
+      <div id="lang-sw-menu"></div>
     </div>
+    <h2 data-i18n="menu.projects">Projeler</h2>
+    <div id="project-grid"></div>
+    <div id="menu-note" data-i18n="menu.note"></div>
   </div>
 </div>
 
+<div id="ctx-menu"></div>
+<div id="hover-dims"></div>
 <input type="file" id="file-input" accept=".glb" style="display:none">
 <div id="live-label"></div>
-<div id="drop-overlay">GLB dosyasını bırak</div>
-<div id="status">PlanStudio hazır</div>
+<div id="drop-overlay">GLB</div>
+<div id="status">PlanStudio</div>
 
 <script type="importmap">
 {

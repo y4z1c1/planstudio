@@ -19,7 +19,9 @@ Scan your home with [Polycam](https://poly.cam), export it as GLB, drop it into 
 - **Walk mode (game-style)** — pointer-lock mouse look with crosshair, WASD/arrow movement with wall collision and slide, doors open/close with `E` (hinged swing animation), spawn at the nearest room center, head bob, sprint with Shift. Furniture is solid: gravity + `Space` jump let you hop onto beds and tables and walk off edges.
 - **Outdoor environment** — sky dome, grass, procedural trees and flowers, animated butterflies; scan window quads are replaced with framed glass windows.
 - **Versioned persistence** — all edits (room names, moved/hidden objects, clones, doors, furniture) are stored per project in `localStorage` with a snapshot history: `Ctrl/⌘+Z` undoes, a history panel restores any of the last 40 states.
-- **Project manager** — a home screen lists your projects; dropped GLB files are stored in IndexedDB so they reopen without re-importing.
+- **Project manager** — a home screen lists your projects (renameable, deletable); dropped GLB files are stored in IndexedDB so they reopen without re-importing. Every project auto-measures on open and starts in plan view (ceiling hidden); walk mode restores the ceiling while you're inside.
+- **Pro UI** — accordion tool groups with keyboard shortcuts (`1` auto-measure, `2` area, `3` distance — these work inside walk mode through the crosshair too, `4/5` views, `6` ceiling, `7` environment, `E` edit, `F` add panel), hover an object in edit mode to see its dimensions, right-click for a context menu (rotate/duplicate/delete), searchable add panel where new furniture follows the cursor until you click to place it.
+- **Bilingual** — full Turkish and English UI (TR/EN switch in the top bar).
 
 ## Running
 

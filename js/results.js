@@ -1,4 +1,5 @@
 import { colorHex, disposeGroup } from './utils.js';
+import { t } from './i18n.js';
 
 // rooms: { name, area|null, dist?, group, color, auto?, meshName? }
 export const rooms = [];
@@ -46,7 +47,7 @@ const totalChipVal = document.getElementById('total-chip-val');
 export function updateResults() {
   roomList.innerHTML = '';
   if (!rooms.length) {
-    roomList.innerHTML = '<div class="empty">Henüz ölçüm yok. "Otomatik Ölç" ile başla.</div>';
+    roomList.innerHTML = `<div class="empty">${t('results.empty')}</div>`;
     totalRow.style.display = 'none';
     if (totalChip) totalChip.style.display = 'none';
     return;

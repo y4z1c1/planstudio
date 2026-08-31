@@ -13,6 +13,7 @@ import * as doors from './doors.js';
 import * as walk from './walk.js';
 import * as env from './env.js';
 import * as projects from './projects.js';
+import { t, lang, setLang, applyStatic } from './i18n.js';
 
 // ---------- scene bootstrap ----------
 const wrap = document.getElementById('canvas-wrap');
@@ -117,6 +118,23 @@ document.querySelectorAll('button').forEach(b =>
   b.addEventListener('click', () => b.blur())
 );
 
+// ---------- i18n boot ----------
+applyStatic();
+document.documentElement.lang = lang;
+document.getElementById('status').textContent = t('status.ready');
+const langSw = document.getElementById('lang-sw');
+langSw.querySelector('#lang-' + lang)?.classList.add('on');
+document.getElementById('lang-tr').onclick = () => lang !== 'tr' && setLang('tr');
+document.getElementById('lang-en').onclick = () => lang !== 'en' && setLang('en');
+document.getElementById('lang-sw-menu').appendChild(langSw.cloneNode(true));
+document.querySelector('#lang-sw-menu #lang-tr').onclick = () => lang !== 'tr' && setLang('tr');
+document.querySelector('#lang-sw-menu #lang-en').onclick = () => lang !== 'en' && setLang('en');
+
+// ---------- accordion groups ----------
+document.querySelectorAll('.grp-head').forEach(head => {
+  head.addEventListener('click', () => head.parentElement.classList.toggle('open'));
+});
+
 // ---------- central event dispatch ----------
 let downPos = null;
 renderer.domElement.addEventListener('pointerdown', ev => {
@@ -155,6 +173,29 @@ walk.init(ctx);
 env.init(ctx);
 projects.init(ctx);
 
+// global shortcuts — registered last so walk/editor/measure get first pick;
+// digits work inside walk mode too (measuring through the crosshair)
+ctx.keyHooks.push(ev => {
+  if (ev.metaKey || ev.ctrlKey || ev.altKey) return false;
+  switch (ev.key) {
+    case '1': document.getElementById('btn-auto').click(); return true;
+    case '2': ctx.setMode('area'); return true;
+    case '3': ctx.setMode('dist'); return true;
+    case '4': document.getElementById('btn-top').click(); return true;
+    case '5': document.getElementById('btn-persp').click(); return true;
+    case '6': document.getElementById('btn-ceiling').click(); return true;
+    case '7': document.getElementById('btn-env').click(); return true;
+    case 'e': case 'E': ctx.setMode('edit'); return true;
+    case 'f': case 'F': {
+      const grp = document.getElementById('grp-add');
+      grp.classList.toggle('open');
+      if (grp.classList.contains('open')) document.getElementById('furn-search').focus();
+      return true;
+    }
+  }
+  return false;
+});
+
 // ---------- model loading ----------
 const loader = new GLTFLoader();
 const modelNameEl = document.getElementById('model-name');
@@ -163,7 +204,7 @@ ctx.loadModel = (url, name, revoke = false) => {
   loader.load(url,
     g => { setModel(g.scene, name); if (revoke) URL.revokeObjectURL(url); },
     undefined,
-    () => { ctx.statusEl.textContent = 'Model yüklenemedi: ' + name; });
+    () => { ctx.statusEl.textContent = t('status.loadFail', { name }); });
 };
 
 function setModel(gltfScene, name) {
@@ -185,7 +226,7 @@ function setModel(gltfScene, name) {
   const s = ctx.modelBox.getSize(new THREE.Vector3());
   modelNameEl.textContent = `${name} — ${s.x.toFixed(1)} × ${s.z.toFixed(1)} × ${s.y.toFixed(1)} m`;
   for (const h of ctx.modelHooks) h(ctx.model, name);
-  ceilingHidden = false;
+  ceilingHidden = true;      // open with the plan view: ceiling hidden by default
   applyCeiling();
 }
 
@@ -208,7 +249,7 @@ const btnCeiling = document.getElementById('btn-ceiling');
 function applyCeiling() {
   btnCeiling.classList.toggle('active', ceilingHidden);
   btnCeiling.querySelector('.lbl').textContent =
-    ceilingHidden ? 'Tavanı Göster' : 'Tavanı Gizle';
+    ceilingHidden ? t('btn.ceilingShow') : t('btn.ceilingHide');
   const ceilings = semantic.semantic?.ceilingsGroup;
   if (ceilings) {
     ceilings.visible = !ceilingHidden;
@@ -221,6 +262,9 @@ function applyCeiling() {
     : 1e6;
 }
 btnCeiling.onclick = () => { ceilingHidden = !ceilingHidden; applyCeiling(); };
+// walk mode restores the ceiling while inside, then puts the cut back
+ctx.setCeiling = hidden => { ceilingHidden = hidden; applyCeiling(); };
+ctx.getCeiling = () => ceilingHidden;
 
 // ---------- camera views ----------
 document.getElementById('btn-top').onclick = () => {

@@ -6,6 +6,7 @@ import * as persist from './persist.js';
 import * as editor from './editor.js';
 import * as catalog from './catalog.js';
 import * as doors from './doors.js';
+import { t } from './i18n.js';
 
 // Polycam semantic-structure support: named Floor_* meshes give exact room
 // areas; Walls / Doors / Objects groups are exposed for the editor & door tools.
@@ -17,20 +18,14 @@ export let semantic = null;
 // filled by measureSemantic: [{name, area, centroid}] — walk mode spawns here
 export const roomCenters = [];
 
-const TR_NAMES = [
-  [/^Floor_Kitchen$/,      () => 'Mutfak'],
-  [/^Floor_Bathroom$/,     () => 'Banyo'],
-  [/^Floor_Hallway$/,      () => 'Koridor'],
-  [/^Floor_Bedroom_(\d+)$/, m => `Yatak Odası ${m[1]}`],
-  [/^Floor_Other_(\d+)$/,   m => `Alan ${m[1]}`],
-  [/^Floor_(.+)$/,          m => m[1]],
-];
-
-function turkishName(meshName) {
-  for (const [re, fmt] of TR_NAMES) {
-    const m = meshName.match(re);
-    if (m) return fmt(m);
-  }
+function roomName(meshName) {
+  let m;
+  if (meshName === 'Floor_Kitchen') return t('room.Kitchen');
+  if (meshName === 'Floor_Bathroom') return t('room.Bathroom');
+  if (meshName === 'Floor_Hallway') return t('room.Hallway');
+  if ((m = meshName.match(/^Floor_Bedroom_(\d+)$/))) return t('room.Bedroom', { n: m[1] });
+  if ((m = meshName.match(/^Floor_Other_(\d+)$/))) return t('room.Other', { n: m[1] });
+  if ((m = meshName.match(/^Floor_(.+)$/))) return m[1];
   return meshName;
 }
 
@@ -60,7 +55,12 @@ const DEFAULT_HIDDEN = {
 
 function onModel(model) {
   semantic = detect(model);
-  if (semantic) {
+  if (!semantic) {
+    roomCenters.length = 0;
+    gridAutoMeasure();   // non-semantic GLBs still get automatic room areas
+    return;
+  }
+  {
     const st = persist.get();
     if (!st.defaultsApplied) {
       for (const name of DEFAULT_HIDDEN[ctx.modelName] || []) {
@@ -189,12 +189,11 @@ export function measureSemantic() {
     ctx.scene.add(group);
 
     addRecord({
-      name: roomNames[m.primary] || turkishName(m.primary),
+      name: roomNames[m.primary] || roomName(m.primary),
       area: m.area, group, color, auto: true, meshName: m.primary,
     });
   }
-  ctx.statusEl.textContent =
-    `Plan: ${measured.length} oda, net ${total.toFixed(1)} m² (Polycam oda verisi, kesin)`;
+  ctx.statusEl.textContent = t('status.plan', { n: measured.length, m2: total.toFixed(1) });
 
   // project-card metadata for the main menu
   persist.get().meta = { area: total, rooms: measured.length, ts: Date.now() };

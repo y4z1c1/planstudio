@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { COLORS, colorHex, makeMarker, makeLine, makeTextLabel, polygonAreaXZ, centroid } from './utils.js';
 import { rooms, counters, addRecord, clearAuto, updateResults } from './results.js';
+import { t } from './i18n.js';
 
 let ctx = null;
 let currentPoints = [];
@@ -69,25 +70,33 @@ function onPointerMove(ev) {
   return false;
 }
 
-function onPointerUp(ev) {
-  if (!ev._isClick) return false;
+// shared click entry — also used by walk mode (crosshair clicks pass a
+// synthetic event at the screen center)
+export function clickAt(ev) {
   if (ctx.mode === 'dist') {
     const p = ctx.pickPoint(ev);
-    if (!p) return true;
+    if (!p) return;
     currentPoints.push(p);
     redrawTemp();
     if (currentPoints.length === 2) finishDistance();
-    return true;
+    return;
   }
   if (ctx.mode === 'area') {
     const p = ctx.pickPoint(ev);
-    if (!p) return true;
+    if (!p) return;
     if (currentPoints.length >= 3 && ctx.worldToScreenDist(currentPoints[0], p) < 20) {
       finishArea();
-      return true;
+      return;
     }
     currentPoints.push(p);
     redrawTemp();
+  }
+}
+
+function onPointerUp(ev) {
+  if (!ev._isClick) return false;
+  if (ctx.mode === 'dist' || ctx.mode === 'area') {
+    clickAt(ev);
     return true;
   }
   return false;
@@ -115,7 +124,7 @@ function finishDistance() {
   const mid = a.clone().add(b).multiplyScalar(0.5);
   group.add(makeTextLabel(d.toFixed(2) + ' m', mid, '#2fc4d9'));
   ctx.scene.add(group);
-  addRecord({ name: `Mesafe ${counters.dist}`, area: null, dist: d, group, color });
+  addRecord({ name: t('room.dist', { n: counters.dist }), area: null, dist: d, group, color });
   cancelCurrent();
 }
 
@@ -142,7 +151,7 @@ function finishArea() {
   c.y = avgY + 0.05;
   group.add(makeTextLabel(area.toFixed(2) + ' m²', c, colorHex(color)));
   ctx.scene.add(group);
-  addRecord({ name: `Oda ${counters.room}`, area, group, color });
+  addRecord({ name: t('room.manual', { n: counters.room }), area, group, color });
   cancelCurrent();
 }
 
@@ -200,7 +209,7 @@ export function autoMeasure() {
       }
     }
   });
-  if (!floorTris.length) { ctx.statusEl.textContent = 'Otomatik ölçüm: zemin bulunamadı'; return; }
+  if (!floorTris.length) { ctx.statusEl.textContent = t('status.noFloor'); return; }
 
   function rasterize(t, mask, yStore) {
     const xs = [t.a.x, t.b.x, t.c.x], zs = [t.a.z, t.b.z, t.c.z];
@@ -327,10 +336,10 @@ export function autoMeasure() {
     group.add(makeTextLabel(r.area.toFixed(2) + ' m²',
       new THREE.Vector3(cx, cy + 0.05, cz), colorHex(color)));
     ctx.scene.add(group);
-    rooms.push({ name: `Oda ${ci2}`, area: r.area, group, color, auto: true });
+    rooms.push({ name: t('room.manual', { n: ci2 }), area: r.area, group, color, auto: true });
   });
 
   updateResults();
   const total = regions.reduce((s, r) => s + r.area, 0);
-  ctx.statusEl.textContent = `Otomatik: ${regions.length} oda, net ${total.toFixed(1)} m² zemin`;
+  ctx.statusEl.textContent = t('status.grid', { n: regions.length, m2: total.toFixed(1) });
 }

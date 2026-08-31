@@ -86,16 +86,17 @@ export function restore(i) {
 }
 
 // short human summary of a snapshot for the history list
+import { t } from './i18n.js';
 export function describe(entry) {
   try {
     const d = JSON.parse(entry.data);
-    const edits = Object.keys(d.scanEdits || {}).length;
     const parts = [];
-    if (edits) parts.push(`${edits} düzenleme`);
-    if ((d.doors || []).length) parts.push(`${d.doors.length} kapı`);
-    if ((d.clones || []).length) parts.push(`${d.clones.length} kopya`);
-    if ((d.furniture || []).length) parts.push(`${d.furniture.length} mobilya`);
-    if (Object.keys(d.roomNames || {}).length) parts.push(`${Object.keys(d.roomNames).length} oda adı`);
-    return parts.join(' · ') || 'boş';
+    const push = (key, n) => { if (n) parts.push(t(key, { n })); };
+    push('history.edits', Object.keys(d.scanEdits || {}).length);
+    push('history.doors', (d.doors || []).length);
+    push('history.clones', (d.clones || []).length);
+    push('history.furn', (d.furniture || []).length);
+    push('history.names', Object.keys(d.roomNames || {}).length);
+    return parts.join(' · ') || t('history.blank');
   } catch { return ''; }
 }

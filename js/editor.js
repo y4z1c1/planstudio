@@ -1,11 +1,13 @@
 import * as THREE from 'three';
 import * as persist from './persist.js';
+import { t } from './i18n.js';
 
 // Unified selection/drag/rotate/delete/duplicate for placed objects:
-// - catalog items (boxes, later Kenney GLBs): userData.def / userData.catalogId
-// - scan objects (Polycam Objects group):     userData.scanName
-// - scan clones:                              userData.cloneSource (+userData.rec)
-// Scan objects are only pickable in 'edit' mode; catalog items are always pickable.
+// - catalog items (boxes, Kenney GLBs): userData.def / userData.catalogId
+// - scan objects (Polycam Objects group):  userData.scanName
+// - scan clones:                           userData.cloneSource (+userData.rec)
+// Plus: hover dimension readout + right-click context menu (edit mode),
+// and the click-to-place flow used by the catalog.
 let ctx = null;
 
 export const placed = [];
@@ -17,41 +19,57 @@ const dragOffset = new THREE.Vector3();
 const floorPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
 const boxA = new THREE.Box3(), boxB = new THREE.Box3();
 const translatedGeos = new Set();
-let onCloneSource = null;   // catalog callback: first time a source becomes clonable
+let onCloneSource = null;
 
-// Turkish labels for Polycam object types (longest prefix wins)
-const TYPE_TR = [
-  ['sofa_rect_l_ex', 'L Koltuk'],
-  ['sofa_rect', 'Koltuk'],
-  ['bed', 'Yatak'],
-  ['table_dining', 'Yemek Masası'],
-  ['table_other', 'Masa'],
-  ['chair_swivel', 'Ofis Sandalyesi'],
-  ['chair_dining', 'Sandalye'],
-  ['chair_other', 'Sandalye'],
-  ['storage_cabinet_tall', 'Boy Dolabı'],
-  ['storage_cabinet_mid', 'Dolap'],
-  ['storage_cabinet_low', 'Alçak Dolap'],
-  ['storage_shelf', 'Raf'],
-  ['oven', 'Fırın'],
-  ['stove', 'Ocak'],
-  ['refrigerator', 'Buzdolabı'],
-  ['washer_dryer', 'Çamaşır Makinesi'],
-  ['toilet', 'Klozet'],
-  ['sink', 'Lavabo'],
-  ['Door', 'Kapı (taramadan)'],
-  ['Window', 'Pencere'],
+// click-to-place state
+let placing = null;          // { obj, onPlace, onCancel }
+
+// hover state
+let hoverObj = null;
+let hoverHelper = null;
+let hoverDimsEl = null;
+let ctxMenuEl = null;
+
+const TYPE_KEYS = [
+  ['sofa_rect_l_ex', 'obj.sofaL'],
+  ['sofa_rect', 'obj.sofa'],
+  ['bed', 'obj.bed'],
+  ['table_dining', 'obj.tableDining'],
+  ['table_other', 'obj.table'],
+  ['chair_swivel', 'obj.chairOffice'],
+  ['chair_dining', 'obj.chair'],
+  ['chair_other', 'obj.chair'],
+  ['storage_cabinet_tall', 'obj.cabinetTall'],
+  ['storage_cabinet_mid', 'obj.cabinet'],
+  ['storage_cabinet_low', 'obj.cabinetLow'],
+  ['storage_shelf', 'obj.shelf'],
+  ['oven', 'obj.oven'],
+  ['stove', 'obj.stove'],
+  ['refrigerator', 'obj.fridge'],
+  ['washer_dryer', 'obj.washer'],
+  ['toilet', 'obj.toilet'],
+  ['sink', 'obj.sink'],
+  ['Door', 'obj.scanDoor'],
+  ['Window', 'obj.window'],
 ];
 
-export function turkishObjectLabel(name) {
-  for (const [prefix, tr] of TYPE_TR) {
-    if (name.startsWith(prefix)) return tr;
+export function objectLabel(name) {
+  for (const [prefix, key] of TYPE_KEYS) {
+    if (name.startsWith(prefix)) return t(key);
   }
   return name;
 }
 
+function labelOf(obj) {
+  const name = obj.userData.scanName || obj.userData.cloneSource;
+  return obj.userData.label || (name && objectLabel(name)) || '';
+}
+
 export function init(c) {
   ctx = c;
+  hoverDimsEl = document.getElementById('hover-dims');
+  ctxMenuEl = document.getElementById('ctx-menu');
+
   ctx.pointerHooks.down.push(onPointerDown);
   ctx.pointerHooks.move.push(onPointerMove);
   ctx.pointerHooks.up.push(onPointerUp);
@@ -63,6 +81,7 @@ export function init(c) {
     mode: 'edit', button: btnEdit,
     hints: [document.getElementById('hint-edit')],
   });
+
   const btnHist = document.getElementById('btn-history');
   const histPanel = document.getElementById('history-panel');
   btnHist.onclick = () => {
@@ -82,38 +101,68 @@ export function init(c) {
     persist.save();
     setTimeout(() => location.reload(), 400);
   };
+
+  // right-click context menu on editable objects
+  ctx.renderer.domElement.addEventListener('contextmenu', ev => {
+    ev.preventDefault();
+    if (ctx.walkActive) return;
+    const obj = pick(ev, true);
+    hideCtxMenu();
+    if (!obj) return;
+    select(obj);
+    showCtxMenu(ev.clientX, ev.clientY, obj);
+  });
+  addEventListener('pointerdown', ev => {
+    if (!ctxMenuEl.contains(ev.target)) hideCtxMenu();
+  }, true);
 }
 
 export function setCloneSourceHandler(fn) { onCloneSource = fn; }
-
-function renderHistory() {
-  const list = document.getElementById('history-list');
-  list.innerHTML = '';
-  const h = persist.history();
-  if (!h.length) {
-    list.textContent = 'Henüz kayıtlı sürüm yok.';
-    return;
-  }
-  h.slice(-15).forEach((entry, idx) => {
-    const i = h.length - Math.min(h.length, 15) + idx;   // absolute index
-    const row = document.createElement('div');
-    row.className = 'furn-item';
-    const t = new Date(entry.ts).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-    const current = i === h.length - 1 ? ' (şimdiki)' : '';
-    row.innerHTML = `<span>${t}${current}</span><span class="dims">${persist.describe(entry)}</span>`;
-    if (!current) {
-      row.title = 'Bu sürüme geri dön';
-      row.onclick = () => { if (persist.restore(i)) location.reload(); };
-    }
-    list.prepend(row);
-  });
-}
 
 export function register(obj) {
   placed.push(obj);
 }
 
-// ---------- scan object registration (called by semantic.js after detection) ----------
+// ---------- click-to-place flow ----------
+export function startPlacing(obj, { onPlace, onCancel } = {}) {
+  cancelPlacing();
+  placing = { obj, onPlace, onCancel };
+  ctx.statusEl.textContent = t('status.placing');
+  ctx.renderer.domElement.style.cursor = 'copy';
+}
+
+export function cancelPlacing() {
+  if (!placing) return;
+  const p = placing;
+  placing = null;
+  ctx.scene.remove(p.obj);
+  const i = placed.indexOf(p.obj);
+  if (i !== -1) placed.splice(i, 1);
+  if (p.onCancel) p.onCancel(p.obj);
+  ctx.renderer.domElement.style.cursor = 'default';
+}
+
+function finishPlacing() {
+  const p = placing;
+  placing = null;
+  ctx.renderer.domElement.style.cursor = 'default';
+  if (p.onPlace) p.onPlace(p.obj);
+  select(p.obj);
+  checkCollisions();
+}
+
+function movePlacing(ev) {
+  ctx.setNDC(ev);
+  floorPlane.constant = -placing.obj.position.y;
+  const hit = new THREE.Vector3();
+  if (ctx.raycaster.ray.intersectPlane(floorPlane, hit)) {
+    placing.obj.position.x = hit.x;
+    placing.obj.position.z = hit.z;
+    checkCollisions();
+  }
+}
+
+// ---------- scan object registration (called by semantic.js) ----------
 export function registerScanObjects(sem) {
   scanByName.clear();
   if (!sem.objectsRoot) return;
@@ -125,7 +174,6 @@ export function registerScanObjects(sem) {
       register(node);
     }
   }
-  // scan door/window quads are editable too (some are mis-scanned cabinet covers)
   for (const grp of [sem.doorsGroup]) {
     if (!grp) continue;
     for (const node of [...grp.children]) {
@@ -135,7 +183,6 @@ export function registerScanObjects(sem) {
       register(node);
     }
   }
-  // restore persisted edits
   const st = persist.get();
   for (const [name, e] of Object.entries(st.scanEdits)) {
     const node = scanByName.get(name);
@@ -155,8 +202,6 @@ export function registerScanObjects(sem) {
   }
 }
 
-// world-baked geometry → move pivot to XZ center at floor level so the node
-// can be positioned/rotated like a normal object
 function recenter(node) {
   if (node.userData.recentered) return;
   const box = new THREE.Box3().setFromObject(node);
@@ -165,7 +210,7 @@ function recenter(node) {
   node.traverse(o => {
     if (!o.isMesh) return;
     let g = o.geometry;
-    if (translatedGeos.has(g)) {   // shared geometry — clone before translating
+    if (translatedGeos.has(g)) {
       g = g.clone();
       o.geometry = g;
     }
@@ -187,8 +232,11 @@ function buildClone(src, sourceName) {
 }
 
 export function duplicate(obj) {
+  if (obj.userData.catalogId && ctx.catalogDuplicate) {
+    return ctx.catalogDuplicate(obj);
+  }
   const sourceName = obj.userData.scanName || obj.userData.cloneSource;
-  if (!sourceName) return null;   // catalog items are spawned from the catalog instead
+  if (!sourceName) return null;
   const src = scanByName.get(sourceName);
   if (!src) return null;
   const cl = buildClone(src, sourceName);
@@ -206,22 +254,33 @@ export function duplicate(obj) {
   return cl;
 }
 
-// spawn a clone at the camera target (catalog "Evdeki eşyalar" entries)
+// spawn a scan clone into the click-to-place flow (catalog entries)
 export function spawnCloneOf(sourceName) {
   const src = scanByName.get(sourceName);
   if (!src) return null;
   const cl = buildClone(src, sourceName);
   cl.position.set(ctx.controls.target.x, src.position.y, ctx.controls.target.z);
-  const rec = { source: sourceName, pos: cl.position.toArray(), rotY: 0 };
-  persist.get().clones.push(rec);
-  cl.userData.rec = rec;
-  cl.userData.recList = persist.get().clones;
-  persist.save();
-  select(cl);
+  startPlacing(cl, {
+    onPlace: obj => {
+      const rec = { source: sourceName, pos: obj.position.toArray(), rotY: obj.rotation.y };
+      persist.get().clones.push(rec);
+      obj.userData.rec = rec;
+      obj.userData.recList = persist.get().clones;
+      persist.save();
+    },
+  });
   return cl;
 }
 
-// ---------- persistence of moves/rotations/deletes ----------
+export function rotateSelected(step = Math.PI / 8) {
+  if (!selected) return;
+  selected.rotation.y += step;
+  refreshHighlight();
+  checkCollisions();
+  persistChange(selected);
+}
+
+// ---------- persistence ----------
 function persistChange(obj) {
   const st = persist.get();
   if (obj.userData.scanName) {
@@ -232,21 +291,21 @@ function persistChange(obj) {
     obj.userData.rec.pos = obj.position.toArray();
     obj.userData.rec.rotY = obj.rotation.y;
   } else {
-    return; // catalog furniture persistence arrives with the Kenney milestone
+    return;
   }
   persist.save();
 }
 
 // ---------- picking ----------
-function isPickable(obj) {
-  if (obj.userData.def || obj.userData.catalogId) return true;       // catalog: always
-  return ctx.mode === 'edit';                                        // scan objects: edit mode only
+function isPickable(obj, forceEditable) {
+  if (obj.userData.def || obj.userData.catalogId) return true;
+  return forceEditable || ctx.mode === 'edit';
 }
 
-function pick(ev) {
+function pick(ev, forceEditable = false) {
   if (!placed.length) return null;
   ctx.setNDC(ev);
-  const candidates = placed.filter(o => o.visible && isPickable(o));
+  const candidates = placed.filter(o => o.visible && isPickable(o, forceEditable));
   if (!candidates.length) return null;
   const hits = ctx.raycaster.intersectObjects(candidates, true);
   for (const h of hits) {
@@ -259,6 +318,7 @@ function pick(ev) {
 }
 
 function onPointerDown(ev) {
+  if (placing) return true;      // click handled on pointerup
   const f = pick(ev);
   if (!f) return false;
   select(f);
@@ -273,19 +333,27 @@ function onPointerDown(ev) {
 }
 
 function onPointerMove(ev) {
-  if (!dragging) return false;
-  ctx.setNDC(ev);
-  const hit = new THREE.Vector3();
-  if (ctx.raycaster.ray.intersectPlane(floorPlane, hit)) {
-    dragging.position.x = hit.x + dragOffset.x;
-    dragging.position.z = hit.z + dragOffset.z;
-    refreshHighlight();
-    checkCollisions();
+  if (placing) { movePlacing(ev); return true; }
+  if (dragging) {
+    ctx.setNDC(ev);
+    const hit = new THREE.Vector3();
+    if (ctx.raycaster.ray.intersectPlane(floorPlane, hit)) {
+      dragging.position.x = hit.x + dragOffset.x;
+      dragging.position.z = hit.z + dragOffset.z;
+      refreshHighlight();
+      checkCollisions();
+    }
+    return true;
   }
-  return true;
+  updateHover(ev);
+  return false;
 }
 
 function onPointerUp(ev) {
+  if (placing) {
+    if (ev._isClick) finishPlacing();
+    return true;
+  }
   if (dragging) {
     persistChange(dragging);
     dragging = null;
@@ -297,29 +365,85 @@ function onPointerUp(ev) {
 }
 
 function onKey(ev) {
-  if (ev.key === 'Escape') { deselect(); return false; }
+  if (ev.key === 'Escape') {
+    if (placing) { cancelPlacing(); return true; }
+    deselect();
+    hideCtxMenu();
+    return false;
+  }
   if (!selected) return false;
-  if (ev.key === 'r' || ev.key === 'R') {
-    selected.rotation.y += Math.PI / 8;
-    refreshHighlight();
-    checkCollisions();
-    persistChange(selected);
-    return true;
-  }
-  if (ev.key === 'd' || ev.key === 'D') {
-    duplicate(selected);
-    return true;
-  }
-  if (ev.key === 'Delete' || ev.key === 'Backspace' && ctx.mode === 'edit' || ev.key === 'x') {
+  if (ev.key === 'r' || ev.key === 'R') { rotateSelected(); return true; }
+  if (ev.key === 'd' || ev.key === 'D') { duplicate(selected); return true; }
+  if (ev.key === 'Delete' || (ev.key === 'Backspace' && ctx.mode === 'edit') || ev.key === 'x') {
     remove(selected);
     return true;
   }
   return false;
 }
 
-// ---------- selection highlight ----------
-// Box3Helper instead of emissive tint: scan materials are shared across many
-// meshes, tinting one would light them all up
+// ---------- hover dimensions (edit mode) ----------
+const hoverSize = new THREE.Vector3();
+
+function updateHover(ev) {
+  if (ctx.mode !== 'edit' || ctx.walkActive) { clearHover(); return; }
+  const obj = pick(ev);
+  if (!obj) { clearHover(); return; }
+  if (obj !== hoverObj) {
+    clearHover();
+    hoverObj = obj;
+    hoverHelper = new THREE.Box3Helper(new THREE.Box3().setFromObject(obj), 0xe8b23e);
+    hoverHelper.material.depthTest = false;
+    hoverHelper.material.transparent = true;
+    hoverHelper.material.opacity = 0.7;
+    hoverHelper.renderOrder = 999;
+    ctx.scene.add(hoverHelper);
+  }
+  new THREE.Box3().setFromObject(obj).getSize(hoverSize);
+  hoverDimsEl.innerHTML =
+    `<span class="t">${labelOf(obj)}</span>` +
+    `${Math.round(hoverSize.x * 100)} × ${Math.round(hoverSize.z * 100)} × ${Math.round(hoverSize.y * 100)} cm`;
+  hoverDimsEl.style.display = 'block';
+  hoverDimsEl.style.left = ev.clientX + 'px';
+  hoverDimsEl.style.top = ev.clientY + 'px';
+}
+
+function clearHover() {
+  if (hoverHelper) {
+    ctx.scene.remove(hoverHelper);
+    hoverHelper.geometry.dispose();
+    hoverHelper.material.dispose();
+    hoverHelper = null;
+  }
+  hoverObj = null;
+  if (hoverDimsEl) hoverDimsEl.style.display = 'none';
+}
+
+// ---------- context menu ----------
+function showCtxMenu(x, y, obj) {
+  new THREE.Box3().setFromObject(obj).getSize(hoverSize);
+  const dims = `${Math.round(hoverSize.x * 100)} × ${Math.round(hoverSize.z * 100)} × ${Math.round(hoverSize.y * 100)} cm`;
+  ctxMenuEl.innerHTML = `<div class="cm-title">${labelOf(obj)} · ${dims}</div>`;
+  const item = (icon, label, fn, cls = '') => {
+    const b = document.createElement('button');
+    b.className = 'cm-item ' + cls;
+    b.innerHTML = `<svg class="ico"><use href="#${icon}"/></svg>${label}`;
+    b.onclick = () => { hideCtxMenu(); fn(); };
+    ctxMenuEl.appendChild(b);
+  };
+  item('i-rotate', t('ctx.rotate'), () => rotateSelected());
+  item('i-copy', t('ctx.duplicate'), () => duplicate(obj));
+  item('i-trash', t('ctx.delete'), () => remove(obj), 'danger');
+  ctxMenuEl.style.display = 'block';
+  const r = ctxMenuEl.getBoundingClientRect();
+  ctxMenuEl.style.left = Math.min(x, innerWidth - r.width - 10) + 'px';
+  ctxMenuEl.style.top = Math.min(y, innerHeight - r.height - 10) + 'px';
+}
+
+function hideCtxMenu() {
+  if (ctxMenuEl) ctxMenuEl.style.display = 'none';
+}
+
+// ---------- selection ----------
 let helper = null;
 
 export function select(obj) {
@@ -329,12 +453,8 @@ export function select(obj) {
   helper.material.depthTest = false;
   helper.renderOrder = 1000;
   ctx.scene.add(helper);
-  const name = obj.userData.scanName || obj.userData.cloneSource;
-  const label = obj.userData.label || (name && turkishObjectLabel(name));
-  if (label) {
-    ctx.statusEl.textContent =
-      `Seçili: ${label}${name ? ` (${name})` : ''} — sürükle=taşı · R=döndür · D=kopyala · Delete=sil`;
-  }
+  const label = labelOf(obj);
+  if (label) ctx.statusEl.textContent = t('status.selected', { label });
 }
 
 export function deselect() {
@@ -352,8 +472,8 @@ export function refreshHighlight() {
 }
 
 export function remove(obj) {
+  clearHover();
   if (obj.userData.scanName) {
-    // scan originals are hidden, never disposed — reset button restores them
     obj.visible = false;
     persist.get().scanEdits[obj.userData.scanName] = { deleted: true };
     persist.save();
@@ -376,7 +496,6 @@ export function remove(obj) {
   checkCollisions();
 }
 
-// overlap tint (AABB approximation) — only catalog boxes with own material opt in
 export function checkCollisions() {
   const tintable = placed.filter(m => m.userData.def && m.material);
   tintable.forEach(m => { m.userData.hit = false; });
@@ -391,6 +510,29 @@ export function checkCollisions() {
     }
   }
   tintable.forEach(m => {
-    m.material.color.set(m.userData.hit ? 0xe5534b : m.userData.def.color);
+    m.material.color.set(m.userData.hit ? 0xe05252 : m.userData.def.color);
+  });
+}
+
+// ---------- history panel ----------
+function renderHistory() {
+  const list = document.getElementById('history-list');
+  list.innerHTML = '';
+  const h = persist.history();
+  if (!h.length) {
+    list.textContent = t('history.empty');
+    return;
+  }
+  h.slice(-15).forEach((entry, idx) => {
+    const i = h.length - Math.min(h.length, 15) + idx;
+    const row = document.createElement('div');
+    row.className = 'furn-item';
+    const time = new Date(entry.ts).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    const current = i === h.length - 1 ? t('history.now') : '';
+    row.innerHTML = `<span>${time}${current}</span><span class="dims">${persist.describe(entry)}</span>`;
+    if (!current) {
+      row.onclick = () => { if (persist.restore(i)) location.reload(); };
+    }
+    list.prepend(row);
   });
 }

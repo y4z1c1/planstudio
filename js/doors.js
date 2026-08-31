@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import * as persist from './persist.js';
 import * as editor from './editor.js';
+import { t } from './i18n.js';
 
 // Door tools: place a real door model (Kenney doorway.glb, CC0) onto walls.
 // - auto-fix: Bedroom_2 / Bedroom_3 were scanned without doors — place one on
@@ -26,7 +27,7 @@ export function init(c) {
   btn.onclick = () => ctx.setMode('door');
   ctx.modeUI.push({
     mode: 'door', button: btn,
-    hints: [document.getElementById('hint-door')],
+    hints: [document.getElementById('hint-door')].filter(Boolean),
   });
   ctx.pointerHooks.up.push(onPointerUp);
   ctx.tickHooks.push(dt => {
@@ -88,7 +89,7 @@ export function setup(semantic) {
   loadTemplate().then(() => {
     for (const rec of st.doors) spawnDoor(rec);
     if (!st.doors.some(d => d.auto)) autoFix();
-  }).catch(() => { ctx.statusEl.textContent = 'Kapı modeli yüklenemedi'; });
+  }).catch(() => { ctx.statusEl.textContent = t('status.doorFail'); });
 }
 
 const fillMaterial = new THREE.MeshStandardMaterial({ color: 0xe8e4dc, roughness: 0.9 });
@@ -98,7 +99,7 @@ function spawnDoor(rec) {
   m.position.fromArray(rec.pos);
   m.rotation.y = rec.rotY || 0;
   m.userData = {
-    label: 'Kapı', rec, recList: persist.get().doors, sharedGeo: true,
+    label: t('obj.door'), rec, recList: persist.get().doors, sharedGeo: true,
   };
   // auto doors sit in a full-height scan hole — back the frame with a wall
   // panel that fills the opening above and beside the door
@@ -210,7 +211,7 @@ function autoFix() {
     const hit = findOpening(t) || t.fallback;
     placeDoor(hit.point, hit.normal, true, hit.width);
   }
-  ctx.statusEl.textContent = 'Eksik kapılar eklendi: Yatak Odası 2 ve 3 (Düzenle modunda taşınabilir)';
+  ctx.statusEl.textContent = t('status.doorsAdded');
 }
 
 function onPointerUp(ev) {
