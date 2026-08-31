@@ -64,7 +64,7 @@ function onModel(model) {
   {
     const st = persist.get();
     if (!st.defaultsApplied) {
-      for (const name of DEFAULT_HIDDEN[ctx.modelName] || []) {
+      for (const name of DEFAULT_HIDDEN[ctx.modelFile] || []) {
         st.scanEdits[name] ||= { deleted: true };
       }
       st.defaultsApplied = true;
@@ -138,7 +138,7 @@ export function measureSemantic() {
   if (!semantic) return;
   clearAuto();
 
-  const merges = DEFAULT_MERGES[ctx.modelName] || {};
+  const merges = DEFAULT_MERGES[ctx.modelFile] || {};
   const groups = new Map();   // primary mesh name -> {meshes:[], area, cx, cz, cy}
   for (const mesh of semantic.floors) {
     const primary = merges[mesh.name] || mesh.name;

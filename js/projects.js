@@ -11,6 +11,19 @@ const BUILTIN = [
   { file: '8_31_2026.glb', labelKey: 'menu.sample' },
   { file: 'nisantasi-1p1.glb', label: 'Nişantaşı 1+1' },
 ];
+// design-suggestion variants: same GLB, separate state, seeded from a preset
+const PRESETS = [
+  { file: 'nisantasi-1p1.glb', state: 'nisantasi-oneri-a', label: 'Nişantaşı · Öneri A — TV karşısı', preset: 'presets/nisantasi-a.json' },
+  { file: 'nisantasi-1p1.glb', state: 'nisantasi-oneri-b', label: 'Nişantaşı · Öneri B — Çalışma köşesi', preset: 'presets/nisantasi-b.json' },
+  { file: 'nisantasi-1p1.glb', state: 'nisantasi-oneri-c', label: 'Nişantaşı · Öneri C — Yemek alanı', preset: 'presets/nisantasi-c.json' },
+];
+const FORKS_KEY = 'ps:forks';
+function forks() {
+  try { return JSON.parse(localStorage.getItem(FORKS_KEY)) || []; } catch { return []; }
+}
+function setForks(list) {
+  try { localStorage.setItem(FORKS_KEY, JSON.stringify(list)); } catch {}
+}
 
 let ctx = null;
 let menuEl, gridEl, fileInput;
@@ -42,24 +55,48 @@ export function init(c) {
   if (reopen) queueMicrotask(() => openByName(reopen));
 }
 
-async function openByName(name) {
-  if (BUILTIN.some(b => b.file === name)) {
-    hideMenu();
-    ctx.loadModel(name, name, false);
-    return;
+async function idbGetModel(name) {
+  const db = await openDB();
+  return new Promise((res, rej) => {
+    const req = db.transaction(STORE).objectStore(STORE).get(name);
+    req.onsuccess = () => res(req.result || null);
+    req.onerror = () => rej(req.error);
+  });
+}
+
+// open a GLB (builtin file or IDB blob) under an arbitrary state key
+async function openFileAs(file, stateKey = null) {
+  hideMenu();
+  let rec = null;
+  try { rec = await idbGetModel(file); } catch {}
+  if (rec?.blob) {
+    const url = URL.createObjectURL(rec.blob);
+    ctx.loadModel(url, file, true, stateKey);
+  } else {
+    ctx.loadModel(file, file, false, stateKey);
   }
+}
+
+// seed a preset state on first open
+async function ensurePreset(state, presetUrl) {
   try {
-    const db = await openDB();
-    const rec = await new Promise((res, rej) => {
-      const req = db.transaction(STORE).objectStore(STORE).get(name);
-      req.onsuccess = () => res(req.result);
-      req.onerror = () => rej(req.error);
-    });
-    if (rec?.blob) {
-      hideMenu();
-      openBlob(rec.blob, rec.name);
-    }
+    if (localStorage.getItem('fp:v1:' + state)) return;
+    const data = await (await fetch(presetUrl)).json();
+    localStorage.setItem('fp:v1:' + state, JSON.stringify({
+      version: 1, roomNames: {}, scanEdits: {}, clones: [], doors: [],
+      furniture: data.furniture || [],
+    }));
   } catch {}
+}
+
+async function openByName(name) {
+  const p = PRESETS.find(x => x.state === name);
+  if (p) { await ensurePreset(p.state, p.preset); return openFileAs(p.file, p.state); }
+  const f = forks().find(x => x.key === name);
+  if (f) return openFileAs(f.file, f.key);
+  if (BUILTIN.some(b => b.file === name)) return openFileAs(name);
+  const rec = await idbGetModel(name).catch(() => null);
+  if (rec?.blob) { hideMenu(); openBlob(rec.blob, rec.name); }
 }
 
 export function showMenu() {
@@ -101,30 +138,78 @@ function displayName(modelName, fallback) {
   return names()[modelName] || fallback;
 }
 
+// ---------- fork ----------
+function forkProject(stateKey, file, label) {
+  const key = 'fork-' + Date.now().toString(36);
+  try {
+    const src = localStorage.getItem('fp:v1:' + stateKey);
+    if (src) localStorage.setItem('fp:v1:' + key, src);
+  } catch {}
+  setForks([...forks(), { key, file, label: label + ' (fork)' }]);
+  render();
+}
+
+function stateDelete(stateKey) {
+  localStorage.removeItem('fp:v1:' + stateKey);
+  localStorage.removeItem('fp:v1:' + stateKey + ':history');
+  setName(stateKey, null);
+}
+
 // ---------- rendering ----------
 async function render() {
   gridEl.innerHTML = '';
   for (const b of BUILTIN) {
+    const label = displayName(b.file, b.labelKey ? t(b.labelKey) : b.label);
     gridEl.appendChild(card({
       modelName: b.file,
-      label: displayName(b.file, b.labelKey ? t(b.labelKey) : b.label),
-      onOpen: () => { ctx.loadModel(b.file, b.file, false); hideMenu(); },
+      label,
+      onOpen: () => openFileAs(b.file),
+      onFork: () => forkProject(b.file, b.file, label),
+    }));
+  }
+  for (const p of PRESETS) {
+    const label = displayName(p.state, p.label);
+    gridEl.appendChild(card({
+      modelName: p.state,
+      label,
+      onOpen: async () => { await ensurePreset(p.state, p.preset); openFileAs(p.file, p.state); },
+      onFork: () => forkProject(p.state, p.file, label),
+      onDelete: async () => {
+        if (!confirm(t('menu.deleteConfirm', { name: label }))) return;
+        stateDelete(p.state);   // resets the suggestion to its preset
+        render();
+      },
+    }));
+  }
+  for (const f of forks()) {
+    const label = displayName(f.key, f.label);
+    gridEl.appendChild(card({
+      modelName: f.key,
+      label,
+      onOpen: () => openFileAs(f.file, f.key),
+      onFork: () => forkProject(f.key, f.file, label),
+      onDelete: async () => {
+        if (!confirm(t('menu.deleteConfirm', { name: label }))) return;
+        stateDelete(f.key);
+        setForks(forks().filter(x => x.key !== f.key));
+        render();
+      },
     }));
   }
   let models = [];
   try { models = await idbList(); } catch {}
   models.sort((a, b) => (b.addedAt || 0) - (a.addedAt || 0));
   for (const m of models) {
+    const label = displayName(m.name, m.name.replace(/\.glb$/i, ''));
     gridEl.appendChild(card({
       modelName: m.name,
-      label: displayName(m.name, m.name.replace(/\.glb$/i, '')),
+      label,
       onOpen: () => openBlob(m.blob, m.name),
+      onFork: () => forkProject(m.name, m.name, label),
       onDelete: async () => {
-        if (!confirm(t('menu.deleteConfirm', { name: displayName(m.name, m.name) }))) return;
+        if (!confirm(t('menu.deleteConfirm', { name: label }))) return;
         try { await idbDelete(m.name); } catch {}
-        localStorage.removeItem('fp:v1:' + m.name);
-        localStorage.removeItem('fp:v1:' + m.name + ':history');
-        setName(m.name, null);
+        stateDelete(m.name);
         render();
       },
     }));
@@ -136,7 +221,7 @@ async function render() {
   gridEl.appendChild(add);
 }
 
-function card({ modelName, label, onOpen, onDelete }) {
+function card({ modelName, label, onOpen, onDelete, onFork }) {
   const div = document.createElement('div');
   div.className = 'proj-card';
   const meta = readMeta(modelName);
@@ -163,6 +248,13 @@ function card({ modelName, label, onOpen, onDelete }) {
     startRename(nameEl, modelName, label);
   };
   actions.appendChild(renameBtn);
+  if (onFork) {
+    const forkBtn = document.createElement('button');
+    forkBtn.title = t('menu.fork');
+    forkBtn.innerHTML = '<svg class="ico" style="width:13px;height:13px"><use href="#i-copy"/></svg>';
+    forkBtn.onclick = ev => { ev.stopPropagation(); onFork(); };
+    actions.appendChild(forkBtn);
+  }
   if (onDelete) {
     const del = document.createElement('button');
     del.className = 'p-del';

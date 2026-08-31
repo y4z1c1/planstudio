@@ -10,6 +10,7 @@ const STRINGS = {
     'menu.deleteConfirm': '"{name}" projesi ve tüm düzenlemeleri silinsin mi?',
     'menu.note': 'Polycam ile taradığın evi GLB olarak dışa aktar, buraya yükle. Oda alanları otomatik ölçülür; mobilya yerleştirip sığıp sığmadığını test edebilir, evin içinde birinci şahıs modunda dolaşabilirsin. Tüm düzenlemeler tarayıcında saklanır.',
     'menu.rename': 'Yeniden adlandır',
+    'menu.fork': 'Forkla (kopyasını çıkar)',
     'menu.delete': 'Projeyi sil',
     'menu.sample': 'Öğrenci Evi (örnek)',
     'top.noProject': 'proje seçilmedi',
@@ -98,6 +99,7 @@ const STRINGS = {
     'k.tv45': '45\u2033 TV', 'k.tv55': '55\u2033 TV', 'k.tv65': '65\u2033 TV',
     'k.laptop': 'MacBook / Laptop', 'k.monitor': 'Monitör 27\u2033',
     'k.mirror': 'Ayaklı boy aynası (oval)',
+    'k.archwin': 'Kemerli pencere (siyah çerçeve)',
   },
   en: {
     'app.subtitle': '3D floor-plan viewer, m² measurement and furniture fitting',
@@ -108,6 +110,7 @@ const STRINGS = {
     'menu.deleteConfirm': 'Delete project "{name}" and all its edits?',
     'menu.note': 'Scan your home with Polycam, export it as GLB and drop it here. Room areas are measured automatically; place real-scale furniture to see what fits, and walk through the home in first person. Everything is stored in your browser.',
     'menu.rename': 'Rename',
+    'menu.fork': 'Fork (duplicate project)',
     'menu.delete': 'Delete project',
     'menu.sample': 'Student Flat (sample)',
     'top.noProject': 'no project selected',
@@ -196,6 +199,7 @@ const STRINGS = {
     'k.tv45': '45\u2033 TV', 'k.tv55': '55\u2033 TV', 'k.tv65': '65\u2033 TV',
     'k.laptop': 'MacBook / Laptop', 'k.monitor': '27\u2033 Monitor',
     'k.mirror': 'Standing arch mirror',
+    'k.archwin': 'Arched window (black frame)',
   },
 };
 

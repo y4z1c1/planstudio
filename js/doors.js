@@ -94,7 +94,7 @@ export function setup(semantic) {
   loadTemplate().then(() => {
     for (const rec of st.doors) spawnDoor(rec);
     // the auto-repair coordinates are specific to the sample scan
-    if (ctx.modelName === '8_31_2026.glb' && !st.doors.some(d => d.auto)) autoFix();
+    if (ctx.modelFile === '8_31_2026.glb' && !st.doors.some(d => d.auto)) autoFix();
   }).catch(() => { ctx.statusEl.textContent = t('status.doorFail'); });
 }
 

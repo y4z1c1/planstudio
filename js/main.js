@@ -229,22 +229,25 @@ ctx.keyHooks.push(ev => {
 const loader = new GLTFLoader();
 const modelNameEl = document.getElementById('model-name');
 
-ctx.loadModel = (url, name, revoke = false) => {
+// stateKey lets forks/design-variants share one GLB while keeping separate
+// saved state; it defaults to the file name
+ctx.loadModel = (url, name, revoke = false, stateKey = null) => {
   loader.load(url,
-    g => { setModel(g.scene, name); if (revoke) URL.revokeObjectURL(url); },
+    g => { setModel(g.scene, name, stateKey); if (revoke) URL.revokeObjectURL(url); },
     undefined,
     () => { ctx.statusEl.textContent = t('status.loadFail', { name }); });
 };
 
-function setModel(gltfScene, name) {
+function setModel(gltfScene, name, stateKey = null) {
   // clear everything the previous model spawned at scene level (doors,
   // furniture, clones, measurement overlays) — otherwise reopening a
   // project duplicates them
   for (const h of ctx.cleanupHooks) h();
   if (ctx.model) scene.remove(ctx.model);
   ctx.model = gltfScene;
-  ctx.modelName = name;
-  persist.loadFor(name);
+  ctx.modelName = stateKey || name;   // persistence / menu identity
+  ctx.modelFile = name;               // scan identity (model-specific fixes)
+  persist.loadFor(ctx.modelName);
   persist.ensureBaseline();
   ctx.model.traverse(o => {
     if (o.isMesh) {

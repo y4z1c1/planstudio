@@ -310,15 +310,57 @@ function buildMirror() {
   return g;
 }
 
+// arched window with black muntin grid (Nişantaşı style), wall-mountable
+function buildArchWindow() {
+  const W = 1.4, H = 2.2, T = 0.05, D = 0.06;
+  const arch = inset => {
+    const w2 = W / 2 - inset, top = H - inset, r = w2;
+    const sh = new THREE.Shape();
+    sh.moveTo(-w2, inset);
+    sh.lineTo(-w2, top - r);
+    sh.absarc(0, top - r, r, Math.PI, 0, true);
+    sh.lineTo(w2, inset);
+    sh.closePath();
+    return sh;
+  };
+  const frameShape = arch(0);
+  frameShape.holes.push(arch(T));
+  const g = new THREE.Group();
+  const black = new THREE.MeshStandardMaterial({ color: 0x181a1e, metalness: 0.6, roughness: 0.4 });
+  g.add(new THREE.Mesh(
+    new THREE.ExtrudeGeometry(frameShape, { depth: D, bevelEnabled: false }), black));
+  const glass = new THREE.Mesh(
+    new THREE.ShapeGeometry(arch(T)),
+    new THREE.MeshStandardMaterial({
+      color: 0xcfe4f0, transparent: true, opacity: 0.3,
+      roughness: 0.1, metalness: 0.1, side: THREE.DoubleSide,
+    }));
+  glass.position.z = D / 2;
+  g.add(glass);
+  const bar = (w, h, x, y) => {
+    const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, 0.035), black);
+    m.position.set(x, y, D / 2);
+    g.add(m);
+  };
+  const springY = H - W / 2;          // where the arch starts
+  bar(W - T * 2, 0.045, 0, springY);  // transom at the arch spring line
+  bar(W - T * 2, 0.045, 0, 0.95);    // mid rail
+  bar(0.04, springY - T, 0, springY / 2 + T / 2);   // center mullion (lower part)
+  bar(0.035, W / 2 - T, 0, springY + (W / 2 - T) / 2);  // center mullion in the arch
+  for (const sx of [-1, 1]) bar(0.03, springY - T, sx * W / 4, springY / 2 + T / 2);
+  return g;
+}
+
 const PROC = {
   'proc:mirror': { key: 'k.mirror', build: buildMirror, dims: '100×180' },
+  'proc:archwindow': { key: 'k.archwin', build: buildArchWindow, dims: '140×220', wallMount: true },
 };
 
 function spawnProc(id, rec = null) {
   const def = PROC[id];
   if (!def) return null;
   const m = def.build();
-  m.userData = { catalogId: id, label: t(def.key) };
+  m.userData = { catalogId: id, label: t(def.key), wallMount: !!def.wallMount };
   m.add(makeTextLabel(t(def.key), new THREE.Vector3(0, 1.95, 0), '#cdd2da', 'furn-label'));
   const floorY = ctx.modelBox ? ctx.modelBox.min.y : 0;
   ctx.scene.add(m);
