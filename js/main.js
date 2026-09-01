@@ -217,6 +217,7 @@ ctx.keyHooks.push(ev => {
     case '6': document.getElementById('btn-ceiling').click(); return true;
     case '7': document.getElementById('btn-env').click(); return true;
     case 'e': case 'E': ctx.setMode('edit'); return true;
+    case 't': case 'T': sun.toggleTimelapse(); return true;
     case 'f': case 'F': {
       const grp = document.getElementById('grp-add');
       grp.classList.toggle('open');

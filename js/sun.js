@@ -17,6 +17,9 @@ let savedCeiling = false;
 let btn = null, panel = null;
 let dateInput, timeInput, northInput, infoEl, timeLabel, clockInput;
 let northArrow = null;
+let lapse = false;         // daylight timelapse (T): sweeps sunrise → sunset
+let lapseHour = 0;
+const LAPSE_SECONDS = 14;  // one full day sweep in real seconds
 
 const TZ = 3;   // Türkiye (UTC+3, no DST)
 const LOCATIONS = {
@@ -44,11 +47,13 @@ export function init(c) {
   btn.onclick = () => (active ? disable() : enable());
   dateInput.addEventListener('input', update);
   timeInput.addEventListener('input', () => {
+    lapse = false;                       // manual scrub cancels the timelapse
     const h = +timeInput.value;
     clockInput.value = fmtH(h);
     update();
   });
   clockInput.addEventListener('input', () => {
+    lapse = false;
     const [hh, mm] = clockInput.value.split(':').map(Number);
     if (!isNaN(hh)) { timeInput.value = hh + (mm || 0) / 60; update(); }
   });
@@ -60,7 +65,37 @@ export function init(c) {
   [dateInput, timeInput, northInput, clockInput].forEach(el =>
     el.addEventListener('keydown', ev => ev.stopPropagation()));
 
-  ctx.cleanupHooks.push(() => { if (active) disable(); });
+  ctx.cleanupHooks.push(() => { lapse = false; if (active) disable(); });
+  ctx.tickHooks.push(dt => {
+    if (!lapse || !active) return;
+    const { lat, lon } = location();
+    const date = new Date(dateInput.value + 'T12:00:00');
+    const s = solar(lat, lon, date, 12);
+    const from = (s.rise ?? 6) - 0.4, to = (s.set ?? 20) + 0.4;
+    lapseHour += ((to - from) / LAPSE_SECONDS) * dt;
+    if (lapseHour > to) lapseHour = from;               // loop the day
+    timeInput.value = lapseHour;
+    clockInput.value = fmtH(lapseHour);
+    ctx.statusEl.textContent = `☀ ${fmtH(lapseHour)} — ${t('status.sunLapse')}`;
+    update();
+  });
+}
+
+// T shortcut (works inside walk mode too): toggles a looping
+// sunrise-to-sunset sweep so you can feel the light in seconds
+export function toggleTimelapse() {
+  if (lapse) {
+    lapse = false;
+    disable();
+    ctx.statusEl.textContent = '';
+    return;
+  }
+  if (!ctx.model) return;
+  if (!active) enable();
+  const { lat, lon } = location();
+  const date = new Date(dateInput.value + 'T12:00:00');
+  lapseHour = (solar(lat, lon, date, 12).rise ?? 6) - 0.4;
+  lapse = true;
 }
 
 function location() {
@@ -134,6 +169,7 @@ function enable() {
 
 function disable() {
   active = false;
+  lapse = false;
   btn.classList.remove('active');
   panel.classList.remove('show');
   if (sunLight) sunLight.visible = false;
