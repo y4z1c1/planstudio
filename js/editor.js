@@ -123,6 +123,44 @@ function placeAt(obj) {
   return false;
 }
 
+// ---------- gravity ----------
+// Drop the object onto the highest support surface below its footprint
+// (floor, table top, another object). Wall-mounted items are exempt.
+const _gRay = new THREE.Raycaster();
+const _gBox = new THREE.Box3();
+
+export function settle(obj) {
+  if (obj.userData.wallMount) return;
+  _gBox.setFromObject(obj);
+  const size = _gBox.getSize(new THREE.Vector3());
+  const cx = (_gBox.min.x + _gBox.max.x) / 2;
+  const cz = (_gBox.min.z + _gBox.max.z) / 2;
+  const originY = _gBox.min.y + 0.03;
+  const targets = [];
+  if (ctx.model) targets.push(ctx.model);
+  for (const o of placed) if (o !== obj && o.visible && o.parent) targets.push(o);
+
+  // center + four footprint corners at 40% extents — the highest hit wins,
+  // so an object half over a table edge still rests on the table
+  const samples = [[0, 0], [0.4, 0.4], [0.4, -0.4], [-0.4, 0.4], [-0.4, -0.4]];
+  let support = ctx.modelBox ? ctx.modelBox.min.y : 0;
+  for (const [fx, fz] of samples) {
+    _gRay.set(new THREE.Vector3(cx + fx * size.x, originY, cz + fz * size.z), _gDown);
+    _gRay.near = 0;
+    _gRay.far = 100;
+    for (const h of _gRay.intersectObjects(targets, true)) {
+      if (!h.object.visible) continue;
+      let p = h.object, own = false;
+      while (p) { if (p === obj) { own = true; break; } p = p.parent; }
+      if (own) continue;
+      if (h.point.y > support) support = h.point.y;
+      break;
+    }
+  }
+  obj.position.y += support - _gBox.min.y;
+}
+const _gDown = new THREE.Vector3(0, -1, 0);
+
 // hover state
 let hoverObj = null;
 let hoverHelper = null;
@@ -173,6 +211,7 @@ export function init(c) {
   ctx.pointerHooks.move.push(onPointerMove);
   ctx.pointerHooks.up.push(onPointerUp);
   ctx.keyHooks.push(onKey);
+  initTransformPanel();
 
   const btnEdit = document.getElementById('btn-edit');
   btnEdit.onclick = () => ctx.setMode('edit');
@@ -270,6 +309,7 @@ function finishPlacing() {
   const p = placing;
   placing = null;
   ctx.renderer.domElement.style.cursor = 'default';
+  settle(p.obj);
   if (p.onPlace) p.onPlace(p.obj);
   select(p.obj);
   checkCollisions();
@@ -434,6 +474,7 @@ export function rotateSelected(step = Math.PI / 8) {
   refreshHighlight();
   checkCollisions();
   persistChange(selected);
+  updateTransformPanel();
 }
 
 // ---------- persistence ----------
@@ -516,7 +557,10 @@ function onPointerUp(ev) {
     return true;
   }
   if (dragging) {
+    settle(dragging);            // gravity: no floating furniture on release
     persistChange(dragging);
+    refreshHighlight();
+    updateTransformPanel();
     dragging = null;
     ctx.controls.enabled = true;
     return true;
@@ -664,6 +708,7 @@ export function select(obj) {
   ctx.scene.add(helper);
   const label = labelOf(obj);
   if (label) ctx.statusEl.textContent = t('status.selected', { label });
+  showTransformPanel();
 }
 
 export function deselect() {
@@ -675,6 +720,70 @@ export function deselect() {
     helper = null;
   }
   selected = null;
+  hideTransformPanel();
+}
+
+// ---------- transform panel (manual position / rotation) ----------
+let tfPanel = null, tfInputs = null, tfName = null;
+let tfMuted = false;   // true while we write values into the inputs
+
+function initTransformPanel() {
+  tfPanel = document.getElementById('tf-panel');
+  tfName = document.getElementById('tf-name');
+  tfInputs = {
+    x: document.getElementById('tf-x'),
+    y: document.getElementById('tf-y'),
+    z: document.getElementById('tf-z'),
+    rot: document.getElementById('tf-rot'),
+  };
+  const apply = () => {
+    if (!selected || tfMuted) return;
+    const p = selected.position;
+    const floorY = ctx.modelBox ? ctx.modelBox.min.y : 0;
+    p.x = parseFloat(tfInputs.x.value) || 0;
+    p.y = floorY + (parseFloat(tfInputs.y.value) || 0);   // input = height above floor
+    p.z = parseFloat(tfInputs.z.value) || 0;
+    selected.rotation.y = (parseFloat(tfInputs.rot.value) || 0) * Math.PI / 180;
+    refreshHighlight();
+    checkCollisions();
+    persistChange(selected);
+  };
+  for (const el of Object.values(tfInputs)) {
+    el.addEventListener('input', apply);
+    el.addEventListener('keydown', ev => ev.stopPropagation());
+  }
+  document.getElementById('tf-drop').onclick = () => {
+    if (!selected) return;
+    settle(selected);
+    refreshHighlight();
+    checkCollisions();
+    persistChange(selected);
+    updateTransformPanel();
+  };
+}
+
+function showTransformPanel() {
+  if (!tfPanel) return;
+  tfPanel.classList.add('show');
+  tfName.textContent = labelOf(selected) || t('tf.object');
+  updateTransformPanel();
+}
+
+function hideTransformPanel() {
+  if (tfPanel) tfPanel.classList.remove('show');
+}
+
+export function updateTransformPanel() {
+  if (!tfPanel || !selected || !tfPanel.classList.contains('show')) return;
+  tfMuted = true;
+  const floorY = ctx.modelBox ? ctx.modelBox.min.y : 0;
+  tfInputs.x.value = selected.position.x.toFixed(2);
+  tfInputs.y.value = (selected.position.y - floorY).toFixed(2);
+  tfInputs.z.value = selected.position.z.toFixed(2);
+  let deg = (selected.rotation.y * 180 / Math.PI) % 360;
+  if (deg < 0) deg += 360;
+  tfInputs.rot.value = Math.round(deg);
+  tfMuted = false;
 }
 
 export function refreshHighlight() {
