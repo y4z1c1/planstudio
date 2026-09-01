@@ -40,8 +40,11 @@ function toggle() {
     for (const mesh of sem.floors) {
       if (!original.has(mesh)) original.set(mesh, mesh.material);
       ensureWorldUVs(mesh);
+      // flatShading matches the scan material — the baked vertex normals are
+      // unreliable and smooth shading renders the floor far too dark
       mesh.material = new THREE.MeshStandardMaterial({
         map: texture, roughness: 0.75, metalness: 0, side: THREE.DoubleSide,
+        flatShading: true,
       });
     }
   } else {
@@ -88,10 +91,10 @@ function makeTexture() {
   cv.width = cv.height = S;
   const g = cv.getContext('2d');
   const rnd = mulberry32(7);
-  const tones = ['#b28457', '#a67a4e', '#bc8d60', '#a1744a', '#b78a5c', '#ab7f52', '#c29366'];
+  const tones = ['#e2e1de', '#dad9d5', '#e9e8e5', '#d2d1cd', '#e5e3df', '#dddcd8', '#efeeeb'];
   const rows = 10, rowH = S / rows;
 
-  g.fillStyle = '#8a6240';           // seam color under everything
+  g.fillStyle = '#b8b7b4';           // seam color under everything
   g.fillRect(0, 0, S, S);
 
   for (let r = 0; r < rows; r++) {
@@ -107,7 +110,7 @@ function makeTexture() {
         // subtle grain streaks along the plank
         g.globalAlpha = 0.12;
         for (let s = 0; s < 6; s++) {
-          g.fillStyle = rnd() > 0.5 ? '#ffffff' : '#3d2a18';
+          g.fillStyle = rnd() > 0.5 ? '#ffffff' : '#8c8b88';
           const sy = y + 4 + rnd() * (rowH - 10);
           g.fillRect(x + dx + 4 + rnd() * len * 0.5, sy, len * (0.2 + rnd() * 0.5), 1 + rnd() * 2);
         }
