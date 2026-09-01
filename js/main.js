@@ -15,6 +15,8 @@ import * as walk from './walk.js';
 import * as env from './env.js';
 import * as projects from './projects.js';
 import * as sun from './sun.js';
+import * as parquet from './parquet.js';
+import * as sync from './sync.js';
 import { t, lang, setLang, applyStatic } from './i18n.js';
 
 // ---------- scene bootstrap ----------
@@ -220,6 +222,8 @@ semantic.init(ctx);
 walk.init(ctx);
 env.init(ctx);
 sun.init(ctx);
+parquet.init(ctx);   // after semantic: its model hook needs the detected floors
+sync.init(ctx);
 projects.init(ctx);
 
 // global shortcuts — registered last so walk/editor/measure get first pick;

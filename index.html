@@ -318,6 +318,18 @@
   #cmp-table td.best { color: var(--green); font-weight: 600; }
   #cmp-table tr.total td { border-top: 1px solid var(--border); font-weight: 600; }
 
+  /* ---------- sync modal ---------- */
+  #sync-overlay {
+    position: absolute; inset: 0; z-index: 85; display: none;
+    align-items: center; justify-content: center;
+    background: rgba(10,11,14,.7); padding: 20px;
+  }
+  #sync-overlay.show { display: flex; }
+  #sync-panel {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 12px;
+    padding: 16px; width: min(400px, 100%);
+  }
+
   /* ---------- mobile ---------- */
   .fab {
     display: none; position: absolute; bottom: calc(14px + env(safe-area-inset-bottom));
@@ -402,6 +414,8 @@
   <symbol id="i-rotate" viewBox="0 0 24 24"><path d="M20 11a8 8 0 10.5 4M20 4v7h-7"/></symbol>
   <symbol id="i-copy" viewBox="0 0 24 24"><path d="M9 9h11v11H9zM5 15H4a1 1 0 01-1-1V4a1 1 0 011-1h10a1 1 0 011 1v1"/></symbol>
   <symbol id="i-pencil" viewBox="0 0 24 24"><path d="M17 3.5l3.5 3.5L8 19.5H4.5V16zM13.5 7l3.5 3.5"/></symbol>
+  <symbol id="i-cloud" viewBox="0 0 24 24"><path d="M7 18.5a4.5 4.5 0 01-.9-8.9 5.5 5.5 0 0110.7-1.3A4.3 4.3 0 0116.7 18.5z"/><path d="M12 11v6M9.5 14.5L12 17l2.5-2.5"/></symbol>
+  <symbol id="i-floor" viewBox="0 0 24 24"><path d="M3 5h18v14H3zM3 12h18M10.5 5v7M15.5 12v7"/></symbol>
 </svg>
 
 <div id="canvas-wrap"></div>
@@ -414,6 +428,7 @@
     <button class="btn" id="btn-save" style="display:none;width:auto;border-color:var(--accent-dim)"><svg class="ico"><use href="#i-check"/></svg><span class="lbl" data-i18n="btn.save">Kaydet</span></button>
     <button class="btn" id="btn-discard" style="display:none;width:auto"><svg class="ico"><use href="#i-undo"/></svg><span class="lbl" data-i18n="btn.discard">Vazgeç</span></button>
     <div id="total-chip"><span data-i18n="top.netArea">Net alan</span><span class="v" id="total-chip-val">–</span></div>
+    <button class="btn" id="btn-cloud" style="width:auto" title="Cloud"><svg class="ico"><use href="#i-cloud"/></svg></button>
     <div id="lang-sw">
       <button id="lang-tr">TR</button><button id="lang-en">EN</button>
     </div>
@@ -441,6 +456,7 @@
       <button class="btn" id="btn-persp"><svg class="ico"><use href="#i-cube"/></svg><span class="lbl" data-i18n="btn.free">Serbest</span><kbd>5</kbd></button>
       <button class="btn" id="btn-ceiling"><svg class="ico"><use href="#i-layers"/></svg><span class="lbl">Tavanı Göster</span><kbd>6</kbd></button>
       <button class="btn" id="btn-env"><svg class="ico"><use href="#i-tree"/></svg><span class="lbl" data-i18n="btn.env">Dış Ortam</span><kbd>7</kbd></button>
+      <button class="btn" id="btn-parquet"><svg class="ico"><use href="#i-floor"/></svg><span class="lbl" data-i18n="btn.parquet">Parke Zemin</span></button>
       <button class="btn" id="btn-sun"><svg class="ico"><use href="#i-sun"/></svg><span class="lbl" data-i18n="btn.sun">Güneş Işığı</span></button>
       <div class="hint" id="sun-panel">
         <div style="display:flex;flex-direction:column;gap:7px;">
@@ -504,7 +520,10 @@
     </div>
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
       <h2 data-i18n="menu.projects" style="margin-bottom:0">Projeler</h2>
-      <button class="btn" id="btn-compare" style="width:auto;border-color:var(--border)"><svg class="ico"><use href="#i-scan"/></svg><span class="lbl" data-i18n="menu.compare">Karşılaştır</span></button>
+      <div style="display:flex;gap:8px">
+        <button class="btn" id="btn-cloud-menu" style="width:auto;border-color:var(--border)"><svg class="ico"><use href="#i-cloud"/></svg><span class="lbl" data-i18n="sync.title">Cloud</span></button>
+        <button class="btn" id="btn-compare" style="width:auto;border-color:var(--border)"><svg class="ico"><use href="#i-scan"/></svg><span class="lbl" data-i18n="menu.compare">Karşılaştır</span></button>
+      </div>
     </div>
     <div id="project-grid"></div>
     <div id="menu-note" data-i18n="menu.note"></div>
@@ -524,6 +543,23 @@
 
 <button class="fab" id="m-tools" aria-label="Araçlar"><svg class="ico"><use href="#i-edit"/></svg></button>
 <button class="fab" id="m-rooms" aria-label="Odalar"><svg class="ico"><use href="#i-area"/></svg></button>
+
+<div id="sync-overlay">
+  <div id="sync-panel">
+    <div id="cmp-head" style="margin-bottom:12px">
+      <h3 data-i18n="sync.title">Cloud kaydetme</h3>
+      <button class="btn" id="sync-close" style="width:auto;padding:4px 8px"><svg class="ico"><use href="#i-x"/></svg></button>
+    </div>
+    <div style="font-size:11.5px;color:var(--muted);line-height:1.6;margin-bottom:12px" data-i18n="sync.hint"></div>
+    <input id="sync-pass" type="password" data-i18n-ph="sync.pass" placeholder="Sync şifresi"
+      style="width:100%;background:var(--panel2);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);font-family:inherit;font-size:13px;padding:8px 10px;outline:none;margin-bottom:10px">
+    <div style="display:flex;gap:8px">
+      <button class="btn" id="sync-push" style="border-color:var(--accent-dim);justify-content:center"><svg class="ico"><use href="#i-cloud"/></svg><span class="lbl" data-i18n="sync.push" style="flex:0 0 auto">Buluta Gönder</span></button>
+      <button class="btn" id="sync-pull" style="border-color:var(--border);justify-content:center"><svg class="ico"><use href="#i-download"/></svg><span class="lbl" data-i18n="sync.pull" style="flex:0 0 auto">Buluttan Al</span></button>
+    </div>
+    <div id="sync-status" style="font-size:12px;color:var(--amber);margin-top:10px;min-height:16px;word-break:break-word"></div>
+  </div>
+</div>
 
 <div id="ctx-menu"></div>
 <div id="hover-dims"></div>

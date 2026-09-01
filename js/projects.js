@@ -446,6 +446,10 @@ export async function deleteFurnitureModel(name) {
     tx.onerror = () => rej(tx.error);
   });
 }
+// house model store, exposed for cloud sync
+export async function listModels() { return idbList(); }
+export async function putModel(rec) { return idbPut(rec); }
+
 async function idbPut(rec) {
   const db = await openDB();
   return new Promise((res, rej) => {
