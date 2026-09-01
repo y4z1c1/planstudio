@@ -158,10 +158,28 @@ document.querySelectorAll('.grp-head').forEach(head => {
   head.addEventListener('click', () => head.parentElement.classList.toggle('open'));
 });
 
+// ---------- mobile bottom sheets ----------
+// on narrow screens toolbar/results hide behind two floating buttons;
+// opening one closes the other, touching the canvas closes both
+{
+  const tb = document.getElementById('toolbar');
+  const rs = document.getElementById('results');
+  const bTools = document.getElementById('m-tools');
+  const bRooms = document.getElementById('m-rooms');
+  const sync = () => {
+    bTools.classList.toggle('active', tb.classList.contains('open-m'));
+    bRooms.classList.toggle('active', rs.classList.contains('open-m'));
+  };
+  bTools.onclick = () => { rs.classList.remove('open-m'); tb.classList.toggle('open-m'); sync(); };
+  bRooms.onclick = () => { tb.classList.remove('open-m'); rs.classList.toggle('open-m'); sync(); };
+  ctx.closeSheets = () => { tb.classList.remove('open-m'); rs.classList.remove('open-m'); sync(); };
+}
+
 // ---------- central event dispatch ----------
 let downPos = null;
 renderer.domElement.addEventListener('pointerdown', ev => {
   downPos = [ev.clientX, ev.clientY];
+  ctx.closeSheets();
   for (const h of ctx.pointerHooks.down) if (h(ev)) return;
 });
 renderer.domElement.addEventListener('pointermove', ev => {

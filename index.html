@@ -2,7 +2,7 @@
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>PlanStudio</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -31,7 +31,7 @@
     font-size: 13px;
   }
   #canvas-wrap { position: absolute; inset: 0; }
-  canvas { display: block; }
+  canvas { display: block; touch-action: none; }
   svg.ico { width: 15px; height: 15px; flex-shrink: 0; stroke: currentColor; fill: none;
     stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 
@@ -317,6 +317,60 @@
   #cmp-table th:first-child, #cmp-table td:first-child { text-align: left; }
   #cmp-table td.best { color: var(--green); font-weight: 600; }
   #cmp-table tr.total td { border-top: 1px solid var(--border); font-weight: 600; }
+
+  /* ---------- mobile ---------- */
+  .fab {
+    display: none; position: absolute; bottom: calc(14px + env(safe-area-inset-bottom));
+    z-index: 15; width: 46px; height: 46px; border-radius: 50%;
+    background: var(--panel); border: 1px solid var(--border); color: var(--text);
+    align-items: center; justify-content: center; cursor: pointer;
+    box-shadow: 0 4px 16px rgba(0,0,0,.45);
+  }
+  .fab svg.ico { width: 19px; height: 19px; }
+  .fab.active { border-color: var(--accent); color: var(--accent); }
+  #m-tools { left: 14px; }
+  #m-rooms { right: 14px; }
+
+  @media (max-width: 768px) {
+    #topbar { gap: 8px; padding: 0 10px; }
+    #topbar .sep, #model-name { display: none; }
+    #btn-save .lbl, #btn-discard .lbl { display: none; }   /* icon-only */
+    .fab { display: flex; }
+
+    /* toolbar + results become bottom sheets, hidden until their fab opens them */
+    #toolbar, #results {
+      top: auto; left: 0; right: 0; bottom: 0; width: 100%;
+      border-radius: 14px 14px 0 0; border-bottom: none;
+      max-height: 52vh;
+      padding-bottom: calc(10px + env(safe-area-inset-bottom));
+      display: none;
+    }
+    #toolbar.open-m { display: flex; }
+    #results.open-m { display: block; }
+
+    #status { bottom: calc(70px + env(safe-area-inset-bottom)); max-width: 62vw; }
+    #interact-prompt { top: calc(50% + 48px); }
+
+    #menu-inner { padding: 28px 16px calc(28px + env(safe-area-inset-bottom)); }
+    #menu-logo h1 { font-size: 22px; }
+    #menu-sub { margin-bottom: 24px; }
+    #project-grid { grid-template-columns: 1fr 1fr; gap: 10px; }
+    .proj-card { padding: 12px; }
+    .proj-card .p-actions { display: flex; }            /* no hover on touch */
+    .proj-card .p-name { padding-right: 84px; }
+    #cmp-overlay { padding: 24px 8px; }
+  }
+  @media (max-width: 430px) {
+    #project-grid { grid-template-columns: 1fr; }
+  }
+  @media (pointer: coarse) {
+    .btn { padding: 9px 10px; }
+    .furn-item { padding: 8px 10px; }
+    .room-item { padding: 8px; }
+    .grp-head { padding: 10px 9px; }
+    .btn kbd, .grp-head kbd { display: none; }          /* no keyboard on touch */
+    #ctx-menu .cm-item { padding: 9px 10px; }
+  }
 </style>
 </head>
 <body>
@@ -467,6 +521,9 @@
     <div id="cmp-table"></div>
   </div>
 </div>
+
+<button class="fab" id="m-tools" aria-label="Araçlar"><svg class="ico"><use href="#i-edit"/></svg></button>
+<button class="fab" id="m-rooms" aria-label="Odalar"><svg class="ico"><use href="#i-area"/></svg></button>
 
 <div id="ctx-menu"></div>
 <div id="hover-dims"></div>

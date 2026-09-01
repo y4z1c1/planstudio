@@ -249,6 +249,7 @@ export function startPlacing(obj, { onPlace, onCancel } = {}) {
   placing = { obj, onPlace, onCancel };
   ctx.statusEl.textContent = t('status.placing');
   ctx.renderer.domElement.style.cursor = 'copy';
+  ctx.closeSheets?.();   // mobile: the catalog sheet covers the canvas
   // picking from the catalog while walking: re-engage the pointer lock so the
   // item can be aimed with the crosshair
   if (ctx.walkActive && ctx.walkResumeLock) ctx.walkResumeLock();
