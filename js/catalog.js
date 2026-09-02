@@ -26,6 +26,9 @@ const KENNEY = [
   { id: 'kenney:loungeChair',      key: 'k.loungeChair', file: 'loungeChair.glb',      target: 0.85, scaleBy: 'w' },
   { id: 'kenney:loungeSofa',       key: 'k.sofa3',       file: 'loungeSofa.glb',       target: 2.00, scaleBy: 'w' },
   { id: 'kenney:loungeSofaCorner', key: 'k.sofaCorner',  file: 'loungeSofaCorner.glb', target: 2.20, scaleBy: 'w' },
+  // IKEA KIVIK tresund light beige, 3-seat + chaise (art. 594.943.87, real-scale rotera GLB)
+  // (metalness: 0 — rotera's packed metal/rough texture renders the fabric black in three.js)
+  { id: 'ikea:kivikChaise',        key: 'k.berkSofa',    file: 'kivikTresundChaise.glb', target: 3.18, scaleBy: 'w', metalness: 0 },
   { id: 'kenney:table',            key: 'k.table',       file: 'table.glb',            target: 1.20, scaleBy: 'w' },
   { id: 'kenney:fridge',           key: 'k.fridge',      file: 'kitchenFridge.glb',    target: 1.80, scaleBy: 'h' },
   { id: 'kenney:washer',           key: 'k.washer',      file: 'washer.glb',           target: 0.85, scaleBy: 'h' },
@@ -48,6 +51,7 @@ const BOXES = [
   { key: 'k.desk',        w: 1.20, d: 0.60, h: 0.75, color: 0xc9a06a },
   { key: 'k.chair',       w: 0.45, d: 0.45, h: 0.90, color: 0x8a8f99 },
   { key: 'k.sofa3',       w: 2.00, d: 0.90, h: 0.85, color: 0x7bc7a3 },
+  { key: 'k.berkSofa',    w: 3.18, d: 1.63, h: 0.83, color: 0xd9cfbf },
   { key: 'k.loungeChair', w: 0.85, d: 0.85, h: 0.85, color: 0x7bc7a3 },
   { key: 'k.table',       w: 1.20, d: 0.80, h: 0.75, color: 0xc9a06a },
   { key: 'k.fridge',      w: 0.70, d: 0.70, h: 1.80, color: 0xd7dce4 },
@@ -178,6 +182,9 @@ function loadTemplate(def) {
   if (templateCache.has(def.id)) return templateCache.get(def.id);
   const p = gltfLoader.loadAsync('assets/furniture/' + def.file).then(gltf => {
     const inner = gltf.scene;
+    if (def.metalness !== undefined) inner.traverse(n => {
+      if (n.isMesh && n.material) { n.material.metalness = def.metalness; n.material.needsUpdate = true; }
+    });
     const box = new THREE.Box3().setFromObject(inner);
     const size = box.getSize(new THREE.Vector3());
     const axis = def.scaleBy === 'h' ? size.y : def.scaleBy === 'd' ? size.z : size.x;
@@ -406,6 +413,15 @@ function loadUserTemplate(name) {
     return gltfLoader.loadAsync(url).finally(() => URL.revokeObjectURL(url));
   }).then(gltf => {
     const inner = gltf.scene;
+    // IKEA rotera exports (Simplygon-optimised) carry a packed metal/rough
+    // texture that three.js reads as fully metallic — the fabric renders
+    // black/invisible without an env map. Force dielectric.
+    const extras = gltf.parser?.json?.asset?.extras || {};
+    if (extras['simplygon-version'] || extras['optimiser-version'] || /^IKEA |^\d{8}(-mini)?$/i.test(name)) {
+      inner.traverse(n => {
+        if (n.isMesh && n.material) { n.material.metalness = 0; n.material.needsUpdate = true; }
+      });
+    }
     const box = new THREE.Box3().setFromObject(inner);
     const size = box.getSize(new THREE.Vector3());
     const maxDim = Math.max(size.x, size.y, size.z);
