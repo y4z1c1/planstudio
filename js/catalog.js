@@ -360,37 +360,23 @@ function buildArchWindow(width) {
   return g;
 }
 
-// curtain on a ceiling-recess rail: full-width sheer (tül) + two opaque side
-// panels (fon), wavy pleats via vertex displacement. w = rail length, h = drop.
+// curtain on a ceiling-recess rail: one full-width pleated panel (no sheer/
+// drape distinction — that's the tailor's call). w = rail length, h = drop.
 function buildCurtain(width, rec) {
   const W = width || 2.6, H = rec?.h || 2.66, gap = 0.012;
   const g = new THREE.Group();
-  const pleated = (w, h, amp, period, mat, offZ) => {
-    const geo = new THREE.PlaneGeometry(w, h, Math.max(8, Math.round(w / 0.02)), 1);
-    const pos = geo.attributes.position;
-    for (let i = 0; i < pos.count; i++) {
-      const x = pos.getX(i);
-      pos.setZ(i, offZ + amp * Math.sin((x / period) * Math.PI * 2));
-    }
-    geo.computeVertexNormals();
-    const m = new THREE.Mesh(geo, mat);
-    m.position.y = gap + h / 2;
-    return m;
-  };
-  const sheer = new THREE.MeshStandardMaterial({
-    color: 0xf4f1ea, transparent: true, opacity: 0.55, roughness: 0.95,
-    side: THREE.DoubleSide, depthWrite: false,
-  });
-  const fon = new THREE.MeshStandardMaterial({
-    color: 0xc9b99c, roughness: 0.9, side: THREE.DoubleSide,
-  });
-  g.add(pleated(W, H - gap, 0.025, 0.14, sheer, 0));
-  const pw = Math.min(W * 0.3, 0.9);
-  for (const sx of [-1, 1]) {
-    const panel = pleated(pw, H - gap, 0.04, 0.16, fon, 0.07);
-    panel.position.x = sx * (W / 2 - pw / 2);
-    g.add(panel);
+  const geo = new THREE.PlaneGeometry(W, H - gap, Math.max(8, Math.round(W / 0.02)), 1);
+  const pos = geo.attributes.position;
+  for (let i = 0; i < pos.count; i++) {
+    const x = pos.getX(i);
+    pos.setZ(i, 0.035 * Math.sin((x / 0.15) * Math.PI * 2));
   }
+  geo.computeVertexNormals();
+  const fabric = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({
+    color: 0xd6c9b2, roughness: 0.92, side: THREE.DoubleSide,
+  }));
+  fabric.position.y = gap + (H - gap) / 2;
+  g.add(fabric);
   const rail = new THREE.Mesh(
     new THREE.BoxGeometry(W + 0.04, 0.02, 0.12),
     new THREE.MeshStandardMaterial({ color: 0xe6e6e2, roughness: 0.6 }));
@@ -402,14 +388,8 @@ function buildCurtain(width, rec) {
   g.userData.dimGuides = [
     { a: [-W / 2, H + 0.08, 0.1], b: [W / 2, H + 0.08, 0.1], text: `${t('dim.rail')} ${cm(W)} cm` },
     { a: [W / 2 + 0.12, gap, 0.1], b: [W / 2 + 0.12, H, 0.1], text: `${t('dim.drop')} ${cm(H)} cm` },
-    { a: [-W / 2, H * 0.55, 0.16], b: [-W / 2 + pw, H * 0.55, 0.16], text: `${t('dim.panel')} ${cm(pw)} cm` },
-    { a: [W / 2 - pw, H * 0.55, 0.16], b: [W / 2, H * 0.55, 0.16], text: `${t('dim.panel')} ${cm(pw)} cm` },
-    { a: [-W / 2 + pw, H * 0.3, 0.13], b: [W / 2 - pw, H * 0.3, 0.13], text: `${t('dim.opening')} ${cm(W - 2 * pw)} cm` },
   ];
-  g.userData.hoverInfo =
-    `${t('dim.rail')} ${cm(W)} · ${t('dim.drop')} ${cm(H)}<br>` +
-    `${t('dim.sheerCut', { n: cm(W * 2.5) })}<br>` +
-    `${t('dim.drapeCut', { n: cm(W * 2), p: cm(W) })}`;
+  g.userData.hoverInfo = `${t('dim.rail')} ${cm(W)} cm · ${t('dim.drop')} ${cm(H)} cm`;
   return g;
 }
 
