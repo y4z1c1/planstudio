@@ -139,6 +139,7 @@ const STRINGS = {
     'k.laptop': 'MacBook / Laptop', 'k.monitor': 'Monitör 27\u2033',
     'k.mirror': 'Ayaklı boy aynası (oval)',
     'k.archwin': 'Kemerli pencere (siyah çerçeve)',
+    'k.curtain': 'Perde (tül + fon)',
   },
   en: {
     'app.subtitle': '3D floor-plan viewer, m² measurement and furniture fitting',
@@ -278,6 +279,7 @@ const STRINGS = {
     'k.laptop': 'MacBook / Laptop', 'k.monitor': '27\u2033 Monitor',
     'k.mirror': 'Standing arch mirror',
     'k.archwin': 'Arched window (black frame)',
+    'k.curtain': 'Curtain (sheer + drapes)',
   },
 };
 

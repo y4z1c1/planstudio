@@ -360,17 +360,60 @@ function buildArchWindow(width) {
   return g;
 }
 
+// curtain on a ceiling-recess rail: full-width sheer (tül) + two opaque side
+// panels (fon), wavy pleats via vertex displacement. w = rail length, h = drop.
+function buildCurtain(width, rec) {
+  const W = width || 2.6, H = rec?.h || 2.66, gap = 0.012;
+  const g = new THREE.Group();
+  const pleated = (w, h, amp, period, mat, offZ) => {
+    const geo = new THREE.PlaneGeometry(w, h, Math.max(8, Math.round(w / 0.02)), 1);
+    const pos = geo.attributes.position;
+    for (let i = 0; i < pos.count; i++) {
+      const x = pos.getX(i);
+      pos.setZ(i, offZ + amp * Math.sin((x / period) * Math.PI * 2));
+    }
+    geo.computeVertexNormals();
+    const m = new THREE.Mesh(geo, mat);
+    m.position.y = gap + h / 2;
+    return m;
+  };
+  const sheer = new THREE.MeshStandardMaterial({
+    color: 0xf4f1ea, transparent: true, opacity: 0.55, roughness: 0.95,
+    side: THREE.DoubleSide, depthWrite: false,
+  });
+  const fon = new THREE.MeshStandardMaterial({
+    color: 0xc9b99c, roughness: 0.9, side: THREE.DoubleSide,
+  });
+  g.add(pleated(W, H - gap, 0.025, 0.14, sheer, 0));
+  const pw = Math.min(W * 0.3, 0.9);
+  for (const sx of [-1, 1]) {
+    const panel = pleated(pw, H - gap, 0.04, 0.16, fon, 0.07);
+    panel.position.x = sx * (W / 2 - pw / 2);
+    g.add(panel);
+  }
+  const rail = new THREE.Mesh(
+    new THREE.BoxGeometry(W + 0.04, 0.02, 0.12),
+    new THREE.MeshStandardMaterial({ color: 0xe6e6e2, roughness: 0.6 }));
+  rail.position.set(0, H + 0.01, 0.035);
+  g.add(rail);
+  g.userData.dimsLabel = `${Math.round(W * 100)}×${Math.round(H * 100)}`;
+  return g;
+}
+
 const PROC = {
   'proc:mirror': { key: 'k.mirror', build: buildMirror, dims: '100×180' },
   'proc:archwindow': { key: 'k.archwin', build: buildArchWindow, dims: '140×220', wallMount: true },
+  'proc:curtain': { key: 'k.curtain', build: buildCurtain, dims: '260×266', wallMount: true },
 };
 
 function spawnProc(id, rec = null) {
   const def = PROC[id];
   if (!def) return null;
-  const m = def.build(rec?.w);
-  m.userData = { catalogId: id, label: t(def.key), wallMount: !!def.wallMount };
-  m.add(makeTextLabel(t(def.key), new THREE.Vector3(0, 1.95, 0), '#cdd2da', 'furn-label'));
+  const m = def.build(rec?.w, rec);
+  const dims = m.userData.dimsLabel;
+  const label = dims ? `${t(def.key)} ${dims}` : t(def.key);
+  m.userData = { catalogId: id, label, wallMount: !!def.wallMount };
+  m.add(makeTextLabel(label, new THREE.Vector3(0, 1.95, 0), '#cdd2da', 'furn-label'));
   const floorY = ctx.modelBox ? ctx.modelBox.min.y : 0;
   ctx.scene.add(m);
   editor.register(m);
