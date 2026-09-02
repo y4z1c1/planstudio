@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { GLTFExporter } from 'three/addons/exporters/GLTFExporter.js';
 import * as persist from './persist.js';
 import { t } from './i18n.js';
+import { makeTextLabel } from './utils.js';
 
 // Unified selection/drag/rotate/delete/duplicate for placed objects:
 // - catalog items (boxes, Kenney GLBs): userData.def / userData.catalogId
@@ -608,6 +609,7 @@ function updateHover(ev) {
     clearHover();
     hoverObj = obj;
     setFurnLabel(obj, true);
+    if (obj.userData.dimGuides) showDimGuides(obj);
     if (ctx.mode === 'edit') {
       hoverHelper = new THREE.Box3Helper(new THREE.Box3().setFromObject(obj), 0xe8b23e);
       hoverHelper.material.depthTest = false;
@@ -617,17 +619,49 @@ function updateHover(ev) {
       ctx.scene.add(hoverHelper);
     }
   }
-  if (ctx.mode !== 'edit') { hoverDimsEl.style.display = 'none'; return; }
+  if (ctx.mode !== 'edit' && !obj.userData.hoverInfo) { hoverDimsEl.style.display = 'none'; return; }
   new THREE.Box3().setFromObject(obj).getSize(hoverSize);
-  hoverDimsEl.innerHTML =
-    `<span class="t">${labelOf(obj)}</span>` +
-    `${Math.round(hoverSize.x * 100)} × ${Math.round(hoverSize.z * 100)} × ${Math.round(hoverSize.y * 100)} cm`;
+  hoverDimsEl.innerHTML = obj.userData.hoverInfo
+    ? `<span class="t">${labelOf(obj)}</span><br>${obj.userData.hoverInfo}`
+    : `<span class="t">${labelOf(obj)}</span>` +
+      `${Math.round(hoverSize.x * 100)} × ${Math.round(hoverSize.z * 100)} × ${Math.round(hoverSize.y * 100)} cm`;
   hoverDimsEl.style.display = 'block';
   hoverDimsEl.style.left = ev.clientX + 'px';
   hoverDimsEl.style.top = ev.clientY + 'px';
 }
 
+// dimension guides: objects may carry userData.dimGuides = [{a, b, text}] in
+// local coords — drawn as amber lines with end ticks + a CSS2D label at the midpoint
+let dimGuideGroup = null;
+function showDimGuides(obj) {
+  hideDimGuides();
+  const g = new THREE.Group();
+  const mat = new THREE.LineBasicMaterial({ color: 0xe8b23e, depthTest: false, transparent: true, opacity: 0.95 });
+  for (const d of obj.userData.dimGuides) {
+    const a = new THREE.Vector3().fromArray(d.a), b = new THREE.Vector3().fromArray(d.b);
+    const dir = b.clone().sub(a).normalize();
+    const tick = (Math.abs(dir.y) > 0.5 ? new THREE.Vector3(1, 0, 0) : new THREE.Vector3(0, 1, 0)).multiplyScalar(0.05);
+    const pts = [a, b, a.clone().add(tick), a.clone().sub(tick), b.clone().add(tick), b.clone().sub(tick)];
+    const geo = new THREE.BufferGeometry().setFromPoints(pts);
+    geo.setIndex([0, 1, 2, 3, 4, 5]);
+    const line = new THREE.LineSegments(geo, mat);
+    line.renderOrder = 998;
+    g.add(line);
+    g.add(makeTextLabel(d.text, a.clone().add(b).multiplyScalar(0.5), '#e8b23e', 'dim-label'));
+  }
+  obj.add(g);
+  dimGuideGroup = g;
+}
+function hideDimGuides() {
+  if (!dimGuideGroup) return;
+  dimGuideGroup.traverse(o => { if (o.isCSS2DObject) o.element.remove(); });
+  dimGuideGroup.parent?.remove(dimGuideGroup);
+  dimGuideGroup.traverse(o => { o.geometry?.dispose?.(); });
+  dimGuideGroup = null;
+}
+
 function clearHover() {
+  hideDimGuides();
   if (hoverHelper) {
     ctx.scene.remove(hoverHelper);
     hoverHelper.geometry.dispose();

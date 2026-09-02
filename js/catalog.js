@@ -396,7 +396,20 @@ function buildCurtain(width, rec) {
     new THREE.MeshStandardMaterial({ color: 0xe6e6e2, roughness: 0.6 }));
   rail.position.set(0, H + 0.01, 0.035);
   g.add(rail);
-  g.userData.dimsLabel = `${Math.round(W * 100)}×${Math.round(H * 100)}`;
+  const cm = v => Math.round(v * 100);
+  g.userData.dimsLabel = `${cm(W)}×${cm(H)}`;
+  // hover guides (local coords) drawn by editor.js while the curtain is hovered
+  g.userData.dimGuides = [
+    { a: [-W / 2, H + 0.08, 0.1], b: [W / 2, H + 0.08, 0.1], text: `${t('dim.rail')} ${cm(W)} cm` },
+    { a: [W / 2 + 0.12, gap, 0.1], b: [W / 2 + 0.12, H, 0.1], text: `${t('dim.drop')} ${cm(H)} cm` },
+    { a: [-W / 2, H * 0.55, 0.16], b: [-W / 2 + pw, H * 0.55, 0.16], text: `${t('dim.panel')} ${cm(pw)} cm` },
+    { a: [W / 2 - pw, H * 0.55, 0.16], b: [W / 2, H * 0.55, 0.16], text: `${t('dim.panel')} ${cm(pw)} cm` },
+    { a: [-W / 2 + pw, H * 0.3, 0.13], b: [W / 2 - pw, H * 0.3, 0.13], text: `${t('dim.opening')} ${cm(W - 2 * pw)} cm` },
+  ];
+  g.userData.hoverInfo =
+    `${t('dim.rail')} ${cm(W)} · ${t('dim.drop')} ${cm(H)}<br>` +
+    `${t('dim.sheerCut', { n: cm(W * 2.5) })}<br>` +
+    `${t('dim.drapeCut', { n: cm(W * 2), p: cm(W) })}`;
   return g;
 }
 
@@ -410,9 +423,9 @@ function spawnProc(id, rec = null) {
   const def = PROC[id];
   if (!def) return null;
   const m = def.build(rec?.w, rec);
-  const dims = m.userData.dimsLabel;
-  const label = dims ? `${t(def.key)} ${dims}` : t(def.key);
-  m.userData = { catalogId: id, label, wallMount: !!def.wallMount };
+  const { dimsLabel, dimGuides, hoverInfo } = m.userData;
+  const label = dimsLabel ? `${t(def.key)} ${dimsLabel}` : t(def.key);
+  m.userData = { catalogId: id, label, wallMount: !!def.wallMount, dimGuides, hoverInfo };
   m.add(makeTextLabel(label, new THREE.Vector3(0, 1.95, 0), '#cdd2da', 'furn-label'));
   const floorY = ctx.modelBox ? ctx.modelBox.min.y : 0;
   ctx.scene.add(m);
