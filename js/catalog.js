@@ -362,21 +362,28 @@ function buildArchWindow(width) {
 
 // curtain on a ceiling-recess rail: one full-width pleated panel (no sheer/
 // drape distinction — that's the tailor's call). w = rail length, h = drop.
+// rec.open = true → drawn back: two gathered stacks at the rail ends.
 function buildCurtain(width, rec) {
-  const W = width || 2.6, H = rec?.h || 2.66, gap = 0.012;
+  const W = width || 2.6, H = rec?.h || 2.66, gap = 0.012, open = !!rec?.open;
   const g = new THREE.Group();
-  const geo = new THREE.PlaneGeometry(W, H - gap, Math.max(8, Math.round(W / 0.02)), 1);
-  const pos = geo.attributes.position;
-  for (let i = 0; i < pos.count; i++) {
-    const x = pos.getX(i);
-    pos.setZ(i, 0.035 * Math.sin((x / 0.15) * Math.PI * 2));
+  const fabricMat = new THREE.MeshStandardMaterial({ color: 0xd6c9b2, roughness: 0.92, side: THREE.DoubleSide });
+  const pleated = (w, amp, period, x) => {
+    const geo = new THREE.PlaneGeometry(w, H - gap, Math.max(8, Math.round(w / 0.015)), 1);
+    const pos = geo.attributes.position;
+    for (let i = 0; i < pos.count; i++) pos.setZ(i, amp * Math.sin((pos.getX(i) / period) * Math.PI * 2));
+    geo.computeVertexNormals();
+    const m = new THREE.Mesh(geo, fabricMat);
+    m.position.set(x, gap + (H - gap) / 2, 0);
+    g.add(m);
+  };
+  if (open) {
+    // each half (W/2 of fabric) gathers to ~22% of its length
+    const pw = Math.max(0.25, W * 0.11);
+    pleated(pw, 0.07, 0.09, -(W / 2 - pw / 2));
+    pleated(pw, 0.07, 0.09, W / 2 - pw / 2);
+  } else {
+    pleated(W, 0.035, 0.15, 0);
   }
-  geo.computeVertexNormals();
-  const fabric = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({
-    color: 0xd6c9b2, roughness: 0.92, side: THREE.DoubleSide,
-  }));
-  fabric.position.y = gap + (H - gap) / 2;
-  g.add(fabric);
   const rail = new THREE.Mesh(
     new THREE.BoxGeometry(W + 0.04, 0.02, 0.12),
     new THREE.MeshStandardMaterial({ color: 0xe6e6e2, roughness: 0.6 }));
